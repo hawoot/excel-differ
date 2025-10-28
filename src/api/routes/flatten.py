@@ -8,6 +8,7 @@ from fastapi import APIRouter, File, UploadFile, Form, HTTPException
 from src.core.job_queue import get_job_queue, JobType
 from src.core.config import get_settings
 from src.api.models import JobAcceptedResponse, ArchiveFormat
+from src.workers.tasks import flatten_task_sync
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,7 @@ async def flatten_workbook(
 
     job_id = queue.submit_job(
         job_type=JobType.FLATTEN,
-        task_func=None,  # Will be implemented in tasks.py
+        task_func=flatten_task_sync,  # For multiprocessing backend
         file=file_content,
         filename=file.filename,
         format=format,

@@ -9,6 +9,7 @@ from typing import Optional
 from src.core.job_queue import get_job_queue, JobType
 from src.core.config import get_settings
 from src.api.models import JobAcceptedResponse
+from src.workers.tasks import compare_task_sync
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +99,7 @@ async def compare_workbooks(
 
     job_id = queue.submit_job(
         job_type=JobType.COMPARE,
-        task_func=None,  # Will be implemented in tasks.py
+        task_func=compare_task_sync,  # For multiprocessing backend
         file_a=file_a_content,
         filename_a=file_a.filename if file_a else None,
         file_b=file_b_content,

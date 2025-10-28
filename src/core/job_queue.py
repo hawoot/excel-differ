@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, Optional, Callable
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 import logging
 
 from src.core.config import get_settings
@@ -120,18 +120,19 @@ class JobQueueBackend(ABC):
 
 class MultiprocessingBackend(JobQueueBackend):
     """
-    Simple multiprocessing-based job queue.
+    Simple thread-based job queue.
     Stores job metadata in JSON files.
     Good for environments without Redis.
+    Note: Uses threads instead of processes for simpler serialization.
     """
 
     def __init__(self, max_workers: int = 4):
         self.max_workers = max_workers
-        self.executor = ProcessPoolExecutor(max_workers=max_workers)
+        self.executor = ThreadPoolExecutor(max_workers=max_workers)
         settings = get_settings()
         self.jobs_dir = settings.TEMP_STORAGE_PATH / "jobs"
         self.jobs_dir.mkdir(parents=True, exist_ok=True)
-        logger.info(f"MultiprocessingBackend initialized with {max_workers} workers")
+        logger.info(f"MultiprocessingBackend initialized with {max_workers} thread workers")
 
     def _get_job_file(self, job_id: str) -> Path:
         """Get the path to a job's metadata file."""
@@ -173,22 +174,42 @@ class MultiprocessingBackend(JobQueueBackend):
     def _task_wrapper(self, job_id: str, task_func: Callable, **kwargs) -> None:
         """
         Wrapper that executes the task and updates job status.
-        This runs in a separate process.
+        This runs in a separate thread.
         """
-        # Note: We can't directly update the job object from here since we're in a different process
-        # Instead, the task_func should handle saving its own results
+        logger.info(f"Task wrapper started for job {job_id}")
         try:
-            result = task_func(job_id=job_id, **kwargs)
-            # Task functions should save their own job status
+            # Update status to RUNNING
+            job = self._load_job(job_id)
+            if job:
+                job.status = JobStatus.RUNNING
+                job.started_at = datetime.now(timezone.utc)
+                self._save_job(job)
+                logger.info(f"Job {job_id} status updated to RUNNING")
+
+            # Execute the task
+            logger.info(f"Executing task for job {job_id}")
+            result = task_func(**kwargs)
+            logger.info(f"Task completed for job {job_id}")
+
+            # Update status to SUCCESS
+            job = self._load_job(job_id)
+            if job:
+                job.status = JobStatus.SUCCESS
+                job.result = result
+                job.completed_at = datetime.now(timezone.utc)
+                self._save_job(job)
+                logger.info(f"Job {job_id} status updated to SUCCESS")
+
         except Exception as e:
             logger.exception(f"Task failed for job {job_id}: {e}")
-            # Try to update job status to failed
-            job = Job(job_id=job_id, job_type=JobType.EXTRACT, status=JobStatus.FAILED, error=str(e))
-            job.completed_at = datetime.now(timezone.utc)
-            try:
+            # Update status to FAILED
+            job = self._load_job(job_id)
+            if job:
+                job.status = JobStatus.FAILED
+                job.error = str(e)
+                job.completed_at = datetime.now(timezone.utc)
                 self._save_job(job)
-            except:
-                pass
+                logger.error(f"Job {job_id} status updated to FAILED: {e}")
 
     def submit_job(
         self, job_type: JobType, task_func: Callable, **kwargs
@@ -196,27 +217,15 @@ class MultiprocessingBackend(JobQueueBackend):
         """Submit a job to the multiprocessing executor."""
         job_id = str(uuid.uuid4())
 
-        # Import tasks dynamically
-        from src.workers import tasks
-
-        # Map job type to Celery task
-        task_map = {
-            JobType.EXTRACT: tasks.extract_task,
-            JobType.FLATTEN: tasks.flatten_task,
-            JobType.COMPARE: tasks.compare_task,
-        }
-
-        task = task_map.get(job_type)
-        if not task:
-            raise ValueError(f"Unknown job type: {job_type}")
+        if task_func is None:
+            raise ValueError("task_func is required for multiprocessing backend")
 
         # Create initial job metadata
         job = Job(job_id=job_id, job_type=job_type, status=JobStatus.QUEUED)
         self._save_job(job)
 
         # Submit to executor
-        # self.executor.submit(self._task_wrapper, job_id, task_func, **kwargs)
-        self.executor.submit(self._task_wrapper, job_id, task, **kwargs)
+        self.executor.submit(self._task_wrapper, job_id, task_func, **kwargs)
 
         logger.info(f"Job {job_id} ({job_type.value}) submitted to multiprocessing queue")
         return job_id

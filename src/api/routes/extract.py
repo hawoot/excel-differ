@@ -9,6 +9,7 @@ from typing import Optional
 from src.core.job_queue import get_job_queue, JobType
 from src.core.config import get_settings
 from src.api.models import JobAcceptedResponse
+from src.workers.tasks import extract_task_sync
 
 logger = logging.getLogger(__name__)
 
@@ -71,11 +72,9 @@ async def extract_and_commit(
     # Submit job to queue
     queue = get_job_queue()
 
-    # Note: The actual task implementation will be in workers/tasks.py
-    # For now, we'll pass the parameters to the task
     job_id = queue.submit_job(
         job_type=JobType.EXTRACT,
-        task_func=None,  # Will be implemented in tasks.py
+        task_func=extract_task_sync,  # For multiprocessing backend
         file=file_content if file else None,
         filename=file.filename if file else None,
         origin_repo=origin_repo,
