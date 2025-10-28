@@ -1,0 +1,34 @@
+# Web Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# Async Job Queue
+celery==5.3.4
+redis==5.0.1
+
+# Excel Processing
+openpyxl==3.1.2
+lxml==4.9.3
+oletools==0.60.1
+pyxlsb==1.0.10
+
+# Git Operations
+GitPython==3.1.40
+
+# Data Validation
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Utilities
+python-dateutil==2.8.2
+pytz==2023.3
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+
+# Development
+black==23.11.0
+flake8==6.1.0
