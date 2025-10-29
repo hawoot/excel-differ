@@ -1,6 +1,6 @@
 # Excel Workbook Flattener - Complete Specifications
 
-**Version:** 2.0
+**Version:** 2.1
 **Date:** 2025-10-29
 **Status:** Authoritative Specification
 
@@ -32,44 +32,46 @@ The **Excel Workbook Flattener** is a standalone component that transforms binar
 **Supported Input Formats:**
 - `.xlsx` - Office Open XML Workbook (primary format)
 - `.xlsm` - Office Open XML Macro-Enabled Workbook (primary format)
-- `.xlsb` - Excel Binary Workbook (requires conversion via LibreOffice)
-- `.xls` - Excel 97-2003 Workbook (requires conversion via LibreOffice)
+- `.xlsb` - Excel Binary Workbook (requires conversion)
+- `.xls` - Excel 97-2003 Workbook (requires conversion)
+
+**Note:** Binary format conversion is handled by a separate Converter component.
 
 **Input Constraints:**
 - Maximum file size: Configurable (default: 200 MB)
 - File must not be corrupted or invalid
 - Password-protected workbooks: Extraction fails (cannot open)
-- Password-protected VBA: VBA extraction fails but workbook extraction succeeds with warnings
+- Password-protected VBA: Can be extracted using oletools
 
 **Input Validation:**
 - File must exist and be readable
 - File extension must match actual file format
-- File must be a valid Excel workbook (can be opened by openpyxl or LibreOffice)
+- File must be a valid Excel workbook
 
 ### 2.2 Output Requirements
 
 **Output Structure:**
 ```
-<snapshot-root>/
+<workbook-flat-root>/
 ├── manifest.json                           # Canonical manifest
 ├── original/
 │   └── <original-filename>                 # Original binary file
 ├── workbook/
 │   ├── metadata.txt                        # Workbook metadata
 │   ├── structure.txt                       # Sheet structure
-│   ├── defined_names.txt                   # Named ranges
-│   ├── calculation_chain.txt               # Calculation order
-│   ├── external_links.txt                  # External references
+│   ├── defined-names.txt                   # Named ranges
+│   ├── calculation-chain.txt               # Calculation order
+│   ├── external-links.txt                  # External references
 │   ├── connections.txt                     # Data connections
 │   └── addins.txt                          # Add-in references
 ├── sheets/
 │   ├── 01.<SheetName>.metadata.json        # Per-sheet metadata
 │   ├── 01.<SheetName>.formulas.txt         # Formula cells
-│   ├── 01.<SheetName>.values_hardcoded.txt # Non-formula cell values
-│   ├── 01.<SheetName>.values_evaluated.txt # All cell values (optional)
-│   ├── 01.<SheetName>.cell_formats.txt     # Cell formatting
-│   ├── 01.<SheetName>.merged_ranges.txt    # Merged cell ranges
-│   ├── 01.<SheetName>.data_validations.txt # Data validation rules
+│   ├── 01.<SheetName>.literal-values.txt   # Non-formula cell values
+│   ├── 01.<SheetName>.computed-values.txt  # All cell values (optional)
+│   ├── 01.<SheetName>.cell-formats.txt     # Cell formatting
+│   ├── 01.<SheetName>.merged-ranges.txt    # Merged cell ranges
+│   ├── 01.<SheetName>.data-validations.txt # Data validation rules
 │   └── 01.<SheetName>.comments.txt         # Cell comments
 ├── tables/
 │   ├── <TableName>.definition.txt          # Table structure
@@ -85,16 +87,16 @@ The **Excel Workbook Flattener** is a standalone component that transforms binar
 │   ├── <ClassName>.cls                     # Class modules
 │   └── <FormName>.frm                      # UserForms
 ├── styles/
-│   ├── cell_styles.txt                     # Named cell styles
-│   ├── number_formats.txt                  # Custom number formats
-│   └── theme.txt                           # Theme colors/fonts
+│   ├── cell-styles.txt                     # Named cell styles
+│   ├── number-formats.txt                  # Custom number formats
+│   └── theme.txt                           # Theme colours/fonts
 └── logs/
     └── extraction.log                      # Extraction warnings/errors
 ```
 
-**Snapshot Root Naming:**
-- Format: `<filename>-snapshot-<ISO8601-timestamp>-<sha256-short>`
-- Example: `budget-snapshot-20251027T143022Z-a3f5c8d1`
+**Flat Root Naming:**
+- Format: `<filename>-flat-<ISO8601-timestamp>-<sha256-short>`
+- Example: `budget-flat-20251027T143022Z-a3f5c8d1`
 - Timestamp: ISO8601 UTC format (YYYYMMDDTHHMMSSsZ)
 - SHA256: First 8 characters of original file hash
 
@@ -158,7 +160,7 @@ Locale: en-US
 **Format:** Tab-delimited with header
 ```
 # Sheet Structure
-# INDEX	NAME	SHEET_ID	VISIBLE	STATE	TAB_COLOR
+# INDEX	NAME	SHEET_ID	VISIBLE	STATE	TAB_COLOUR
 
 1	Dashboard	1	TRUE	visible	#FF5733
 2	Data	2	TRUE	visible
@@ -172,19 +174,19 @@ Locale: en-US
 - `SHEET_ID`: Internal Excel sheet ID (integer)
 - `VISIBLE`: TRUE or FALSE (boolean convenience)
 - `STATE`: visible, hidden, or veryHidden (Excel's three visibility states)
-- `TAB_COLOR`: Hex color (#RRGGBB) or theme reference (theme:N) or empty
+- `TAB_COLOUR`: Hex colour (#RRGGBB) or theme reference (theme:N) or empty
 
 **Sorting:** By INDEX (ascending)
 
 **Implementation Notes:**
 - Iterate `workbook.worksheets` to preserve order
 - Use `sheet.sheet_state` for visibility
-- Extract `sheet.sheet_properties.tabColor` for color
-- Handle missing tab colors (empty string)
+- Extract `sheet.sheet_properties.tabColor` for colour
+- Handle missing tab colours (empty string)
 
 ---
 
-### 3.3 Defined Names (`workbook/defined_names.txt`)
+### 3.3 Defined Names (`workbook/defined-names.txt`)
 
 **Purpose:** Extract named ranges and constants.
 
@@ -214,11 +216,10 @@ _xlnm._FilterDatabase	Data	Data!$A$1:$F$100
 - Use `workbook.defined_names.items()`
 - Handle `destinations` attribute for cell references
 - For constants (no destinations), use `defn.value`
-- Normalize cell references to uppercase
 
 ---
 
-### 3.4 Calculation Chain (`workbook/calculation_chain.txt`)
+### 3.4 Calculation Chain (`workbook/calculation-chain.txt`)
 
 **Purpose:** Document formula calculation order.
 
@@ -234,14 +235,13 @@ Data!E5
 Summary!B10
 ```
 
-**Implementation Status:** **NOT YET IMPLEMENTED**
-- Placeholder file created with comment: `# Calculation chain (not yet implemented)`
-- Future: Parse `xl/calcChain.xml` from workbook ZIP
+**Implementation Notes:**
+- Parse `xl/calcChain.xml` from workbook ZIP
 - Useful for debugging circular references and performance
 
 ---
 
-### 3.5 External Links (`workbook/external_links.txt`)
+### 3.5 External Links (`workbook/external-links.txt`)
 
 **Purpose:** Document references to other workbooks.
 
@@ -254,9 +254,8 @@ Summary!B10
 2	external	\\server\share\data.xlsx
 ```
 
-**Implementation Status:** **NOT YET IMPLEMENTED**
-- Placeholder file created
-- Future: Parse `xl/externalLinks/` from workbook ZIP
+**Implementation Notes:**
+- Parse `xl/externalLinks/` from workbook ZIP
 - Important for tracking workbook dependencies
 
 ---
@@ -275,9 +274,8 @@ WebData	Web	https://api.example.com/data
 QueryTable	OLEDB	Provider=Microsoft.ACE.OLEDB.12.0;Data Source=C:\data.xlsx
 ```
 
-**Implementation Status:** **NOT YET IMPLEMENTED**
-- Placeholder file created
-- Future: Parse `xl/connections.xml`
+**Implementation Notes:**
+- Parse `xl/connections.xml`
 - Critical for understanding data sources
 
 ---
@@ -295,9 +293,8 @@ CustomFunctions.xlam
 C:\AddIns\MyTools.xlam
 ```
 
-**Implementation Status:** **NOT YET IMPLEMENTED**
-- Placeholder file created
-- Future: Parse workbook XML for add-in references
+**Implementation Notes:**
+- Parse workbook XML for add-in references
 - Important for formula interpretation
 
 ---
@@ -326,7 +323,7 @@ C:\AddIns\MyTools.xlam
 - `sheetId`: Internal Excel sheet ID (integer)
 - `visible`: Boolean convenience flag
 - `state`: "visible", "hidden", or "veryHidden"
-- `tab_color`: Hex color or theme reference (optional)
+- `tab_color`: Hex colour or theme reference (optional)
 - `protection`: Object describing protection (optional)
   - `sheet_protected`: Boolean
   - `password`: Boolean (true if password set, doesn't expose password)
@@ -346,38 +343,42 @@ A1	=SUM(B1:B10)
 A2	=B2*$C$1
 A3	=IF(B3>100,"High","Low")
 D5	=VLOOKUP(A5,Data!$A$1:$C$100,2,FALSE)
+E10	=UNIQUE(A1:A100)
 ```
 
 **Columns:**
 - `ADDRESS`: Cell address (e.g., A1, B2, AA100)
-- `FORMULA`: Normalized formula (with leading =)
+- `FORMULA`: Formula exactly as stored in Excel (with leading =)
 
 **Sorting:** Row-major order (A1, A2, A3, ..., B1, B2, ...)
 
-**Formula Normalization Rules:**
-1. **Preserve leading `=`**: Always include equals sign
-2. **Function names uppercase**: `SUM` not `sum`, `VLOOKUP` not `vlookup`
-3. **Trim whitespace**: No leading/trailing spaces
-4. **Preserve structure**: Do NOT simplify or rewrite logic
-5. **Preserve references**: Keep absolute ($A$1) vs relative (A1) as-is
-6. **Preserve operators**: Keep spaces around operators as-is (for now)
-7. **Case sensitivity**: Cell references uppercase (A1 not a1)
+**Formula Extraction Rules:**
+1. **Preserve exactly as stored**: Do NOT modify case, spacing, or logic
+2. **Include leading `=`**: Always include equals sign
+3. **Preserve references**: Keep absolute ($A$1) vs relative (A1) as-is
+4. **Array formulas**: Preserve `{=formula}` syntax if present
+5. **Dynamic arrays**: Extract from anchor cell (e.g., `=UNIQUE(A1:A100)`)
+6. **Named ranges**: Keep as-is (e.g., `=SUM(Revenue)`)
+7. **External references**: Keep as-is (e.g., `=[other.xlsx]Sheet1!A1`)
+
+**Excel 365 Dynamic Arrays:**
+- Extract formula from anchor cell
+- Spill range cells will be empty (no formula, just computed result)
+- Functions: `UNIQUE`, `SORT`, `FILTER`, `SORTBY`, `SEQUENCE`, `RANDARRAY`, etc.
 
 **Edge Cases:**
-- Array formulas: Preserve `{=formula}` syntax
 - Shared formulas: Expand to individual cell references
-- Named ranges in formulas: Keep as-is (e.g., `=SUM(Revenue)`)
-- External references: Keep as-is (e.g., `=[other.xlsx]Sheet1!A1`)
+- Multi-cell array formulas: Extract from each cell in range
 
 ---
 
-### 4.3 Hardcoded Values (`sheets/01.<SheetName>.values_hardcoded.txt`)
+### 4.3 Literal Values (`sheets/01.<SheetName>.literal-values.txt`)
 
 **Purpose:** Extract values from non-formula cells only.
 
 **Format:** Tab-delimited with header
 ```
-# Hard-coded Values (non-formula cells only)
+# Literal Values (non-formula cells only)
 # ADDRESS	VALUE
 
 B1	Revenue
@@ -392,64 +393,46 @@ E1	2025-01-15T00:00:00Z
 
 **Columns:**
 - `ADDRESS`: Cell address
-- `VALUE`: Normalized value (see normalization rules below)
+- `VALUE`: Value exactly as stored in Excel
 
 **Sorting:** Row-major order
 
 **MANDATORY:** This file is always created, even if empty.
 
-**Value Normalization Rules:**
-
-**Numbers:**
-- Plain decimal notation (no commas, no currency symbols)
-- Up to 15 significant digits (Excel's precision limit)
-- Integers without decimal point: `100` not `100.0`
-- Floats with minimal precision: `3.14159265358979` (15 sig figs max)
-- Avoid scientific notation unless necessary (very large/small numbers)
-
-**Strings:**
-- Preserve exact content
-- Normalize line endings to `\n` (LF)
-- No escaping needed (tab-delimited format handles it)
-- Empty strings: Empty value column
-
-**Booleans:**
-- `TRUE` or `FALSE` (uppercase)
-
-**Dates:**
-- ISO8601 format with timezone: `2025-01-15T00:00:00Z`
-- UTC preferred
-- Include time component even if midnight
-
-**Null/Empty:**
-- Empty cells: Not included in file at all (no row)
+**Value Extraction Rules:**
+- **Extract as-is**: No formatting, no truncation, no case changes
+- **Numbers**: Extract full precision as stored by Excel
+- **Strings**: Exact content, preserve line endings as `\n`
+- **Booleans**: `TRUE` or `FALSE` (Excel's format)
+- **Dates**: ISO8601 format with timezone: `2025-01-15T00:00:00Z`
+- **Empty cells**: Not included in file at all (no row)
 
 ---
 
-### 4.4 Evaluated Values (`sheets/01.<SheetName>.values_evaluated.txt`)
+### 4.4 Computed Values (`sheets/01.<SheetName>.computed-values.txt`)
 
-**Purpose:** Extract displayed values for all cells (formulas and hardcoded).
+**Purpose:** Extract displayed values for all cells (formulas and literals).
 
-**Status:** OPTIONAL - Created only when `include_evaluated=true`
+**Status:** OPTIONAL - Created only when `include_computed=true`
 
 **Format:** Tab-delimited with header
 ```
-# Evaluated Values (all cells, including formula results)
+# Computed Values (all cells, including formula results)
 # ADDRESS	VALUE
 
-A1	12500|cached
-A2	2625|cached
+A1	12500
+A2	2625
 B1	Revenue
 B2	1250000
 ```
 
 **Columns:**
 - `ADDRESS`: Cell address
-- `VALUE`: Displayed value, optionally with `|cached` or `|computed` suffix
+- `VALUE`: Displayed value
 
 **Value Source:**
 - Formula cells: Cached values from workbook (Excel stores last computed result)
-- Non-formula cells: Same as hardcoded values
+- Non-formula cells: Same as literal values
 - **NOT recomputed**: Flattener does not recalculate formulas
 
 **Note on Volatile Functions:**
@@ -460,11 +443,10 @@ B2	1250000
 **Implementation Limitation:**
 - With `openpyxl`, loading `data_only=False` gives formulas but not cached values
 - To get cached values, need to reload workbook with `data_only=True`
-- Current implementation: Uses cached values if available, otherwise marks as unavailable
 
 ---
 
-### 4.5 Cell Formats (`sheets/01.<SheetName>.cell_formats.txt`)
+### 4.5 Cell Formats (`sheets/01.<SheetName>.cell-formats.txt`)
 
 **Purpose:** Extract cell formatting (fonts, fills, alignment, number formats).
 
@@ -521,17 +503,16 @@ C3	border:yes|align:wrap
 
 **Border:**
 - Simplified: `border:yes` (if any borders present)
-- Future: Detail each border side and style
 
 **Sorting:** Row-major order
 
-**Optimization:**
+**Optimisation:**
 - Only include cells with non-default formatting
 - Skip cells with all default values
 
 ---
 
-### 4.6 Merged Ranges (`sheets/01.<SheetName>.merged_ranges.txt`)
+### 4.6 Merged Ranges (`sheets/01.<SheetName>.merged-ranges.txt`)
 
 **Purpose:** Document merged cell ranges.
 
@@ -552,7 +533,7 @@ B10:D12
 
 ---
 
-### 4.7 Data Validations (`sheets/01.<SheetName>.data_validations.txt`)
+### 4.7 Data Validations (`sheets/01.<SheetName>.data-validations.txt`)
 
 **Purpose:** Extract data validation rules.
 
@@ -592,10 +573,9 @@ B5	Jane Smith|TODO: Verify this formula
 - `ADDRESS`: Cell address
 - `AUTHOR|TEXT`: Author name, pipe separator, comment text
 
-**Text Normalization:**
-- Replace `\n` (newline) with `\\n` (escaped)
-- Remove `\r` (carriage return)
+**Text Handling:**
 - Preserve exact text content
+- Normalise line endings to `\n` (LF)
 
 **Sorting:** Row-major order
 
@@ -630,9 +610,8 @@ Column Formulas:
   Total: =[@Quantity]*[@Price]
 ```
 
-**Implementation Status:** **NOT YET IMPLEMENTED**
-- Placeholder files created
-- Future: Use `sheet.tables` or parse `xl/tables/` XML
+**Implementation Notes:**
+- Use `sheet.tables` or parse `xl/tables/` XML
 
 ---
 
@@ -683,7 +662,7 @@ Y-Axis: Revenue ($)
 Legend Position: right
 ```
 
-**Implementation Status:** **NOT YET IMPLEMENTED**
+**Implementation Notes:**
 - Parsing chart XML is complex
 - Fallback: Save raw XML (see below)
 
@@ -734,9 +713,8 @@ Filters:
   - Year = 2025
 ```
 
-**Implementation Status:** **NOT YET IMPLEMENTED**
+**Implementation Notes:**
 - Very complex to parse (requires understanding PivotTable cache)
-- Low priority for initial implementation
 
 ---
 
@@ -746,7 +724,7 @@ Filters:
 
 **Purpose:** Preserve complete VBA project binary.
 
-**Implementation:** ALWAYS extract and save, even if modules can't be parsed.
+**Implementation:** ALWAYS extract and save.
 
 **Extraction Method:**
 - For `.xlsm` files: Extract `xl/vbaProject.bin` from ZIP
@@ -787,14 +765,13 @@ for (filename, stream_path, vba_filename, vba_code) in vba.extract_all_macros():
 ```
 
 **Password-Protected VBA:**
-- If extraction fails with password error:
-  - Create marker file: `<ModuleName>.EXTRACTION_PROTECTED`
-  - Add warning to `manifest.json`
-  - Keep `vbaProject.bin` intact
+- Use oletools which can extract even with password protection
+- If extraction still fails: Add warning to `manifest.json`
+- Always keep `vbaProject.bin` intact
 
-**Normalization:**
+**Extraction Rules:**
 - **DO NOT** reformat or modify VBA code
-- Preserve line endings as extracted (then normalize to LF)
+- Preserve line endings as extracted (then normalise to LF)
 - Preserve exact indentation and spacing
 - Critical for accurate diffs
 
@@ -802,7 +779,7 @@ for (filename, stream_path, vba_filename, vba_code) in vba.extract_all_macros():
 
 ## 9. Styles Extraction
 
-### 9.1 Cell Styles (`styles/cell_styles.txt`)
+### 9.1 Cell Styles (`styles/cell-styles.txt`)
 
 **Purpose:** Document named cell styles.
 
@@ -822,12 +799,12 @@ Style: Currency
   Alignment: right, center
 ```
 
-**Implementation Status:** **NOT YET IMPLEMENTED**
+**Implementation Notes:**
 - Use `workbook.style_names` and `workbook._named_styles`
 
 ---
 
-### 9.2 Number Formats (`styles/number_formats.txt`)
+### 9.2 Number Formats (`styles/number-formats.txt`)
 
 **Purpose:** List custom number formats.
 
@@ -841,14 +818,14 @@ Style: Currency
 166	yyyy-mm-dd hh:mm:ss
 ```
 
-**Implementation Status:** **NOT YET IMPLEMENTED**
+**Implementation Notes:**
 - Parse `workbook.style` and extract custom formats (ID >= 164)
 
 ---
 
 ### 9.3 Theme (`styles/theme.txt`)
 
-**Purpose:** Document theme colors and fonts.
+**Purpose:** Document theme colours and fonts.
 
 **Format:** Multi-section text file
 ```
@@ -857,7 +834,7 @@ Style: Currency
 
 Name: Office Theme
 
-Colors:
+Colours:
   theme:0 (Light 1): #FFFFFF
   theme:1 (Dark 1): #000000
   theme:2 (Light 2): #E7E6E6
@@ -870,9 +847,9 @@ Fonts:
   Minor (Body): Calibri
 ```
 
-**Implementation Status:** **NOT YET IMPLEMENTED**
+**Implementation Notes:**
 - Parse `xl/theme/theme1.xml` from ZIP
-- Important for interpreting theme-based colors
+- Important for interpreting theme-based colours
 
 ---
 
@@ -894,8 +871,8 @@ The manifest is the **single source of truth** about the extraction:
   "workbook_filename": "budget.xlsb",
   "original_sha256": "a3f5c8d1e7b4f2a9c1d5e8b3f7a2c9d4e1f8b5a7c3d9e2f6b8a4c1d7e9f3b6a8",
   "extracted_at": "2025-10-27T14:30:22Z",
-  "extractor_version": "2.0.0",
-  "include_evaluated": false,
+  "extractor_version": "2.1.0",
+  "include_computed": false,
 
   "sheets": [
     {
@@ -924,7 +901,6 @@ The manifest is the **single source of truth** about the extraction:
   ],
 
   "warnings": [
-    "VBA project is password protected, modules could not be extracted",
     "Chart 'Sales Trend' could not be parsed, saved as raw XML"
   ],
 
@@ -943,7 +919,7 @@ The manifest is the **single source of truth** about the extraction:
 - `original_sha256`: SHA256 hash of original binary file (hex string)
 - `extracted_at`: Extraction timestamp (ISO8601 UTC string)
 - `extractor_version`: Flattener version (semver string)
-- `include_evaluated`: Whether evaluated values were extracted (boolean)
+- `include_computed`: Whether computed values were extracted (boolean)
 - `sheets`: Array of sheet objects (see below)
 - `files`: Array of file objects (see below)
 - `warnings`: Array of warning strings (empty array if none)
@@ -971,7 +947,7 @@ The manifest is the **single source of truth** about the extraction:
 
 ```json
 {
-  "path": "sheets/01.Dashboard.formulas.txt",  // Relative to snapshot root
+  "path": "sheets/01.Dashboard.formulas.txt",  // Relative to flat root
   "sha256": "abc123..."                        // SHA256 hex string
 }
 ```
@@ -984,9 +960,9 @@ The manifest is the **single source of truth** about the extraction:
 
 ---
 
-## 11. Normalization Rules (Determinism)
+## 11. Normalisation Rules (Minimal)
 
-**Critical:** These rules ensure identical input produces identical output.
+**Philosophy:** Extract data as-is from Excel. Only normalise where absolutely necessary for consistent diffs.
 
 ### 11.1 Text Encoding
 - **All text files:** UTF-8 encoding
@@ -1000,52 +976,38 @@ The manifest is the **single source of truth** about the extraction:
 - **Named ranges:** Sort by scope, then name
 - **Defined names:** Workbook scope first, then sheets alphabetically
 
-### 11.3 Cell Address Normalization
+### 11.3 Cell Address Normalisation
 - **Uppercase:** A1 not a1
 - **Dollar signs:** Preserve in formulas (for absolute references)
 - **Sorting:** Remove dollar signs before sorting
 
-### 11.4 Formula Normalization
-- **Function names:** Uppercase (SUM not sum)
-- **Whitespace:** Trim leading/trailing
-- **Operators:** Preserve as-is (no reformatting)
-- **References:** Uppercase cell addresses
-- **Logic:** NEVER change formula logic
+### 11.4 What is NOT Normalised
 
-### 11.5 Number Normalization
-- **Integers:** No decimal point (100 not 100.0)
-- **Decimals:** Plain notation (3.14159 not 3.14E+00)
-- **Precision:** Max 15 significant digits
-- **Rounding:** Use Excel's rounding rules
-- **Special values:** Preserve INF, -INF, NaN if present
+**Formulas:**
+- Extract exactly as stored in Excel
+- Keep original case: `sum(A1:A10)` stays `sum(A1:A10)`, not `SUM(A1:A10)`
+- Keep original spacing and structure
+- **Rationale:** Any change in formula is significant and should be visible in diff
 
-### 11.6 Date Normalization
-- **Format:** ISO8601 with timezone
-- **Timezone:** UTC (append Z)
-- **Example:** 2025-10-27T14:30:00Z
-- **Precision:** Seconds (no milliseconds)
+**Numbers:**
+- Extract full precision as stored by Excel
+- No truncation to 15 digits
+- No format changes
+- **Rationale:** Precision changes should be visible
 
-### 11.7 Boolean Normalization
-- **Values:** TRUE or FALSE (uppercase)
-- **Never:** Yes/No, 1/0, yes/no
+**Dates:**
+- Extract as ISO8601 for readability
+- Include timezone (UTC)
+- **Rationale:** Standard format aids diffs
 
-### 11.8 String Normalization
-- **Line endings:** Convert CRLF, CR to LF
-- **Trailing spaces:** Preserve (might be significant)
-- **Unicode:** Preserve exact Unicode characters
+**Strings:**
+- Preserve exact content
+- Only normalise line endings to LF (for cross-platform consistency)
+- **Rationale:** Any text change should be visible
 
-### 11.9 Color Normalization
-- **RGB:** Hex format #RRGGBB (uppercase)
-- **Alpha:** Strip alpha channel (AARRGGBB → RRGGBB)
-- **Theme colors:** Format theme:N (e.g., theme:4)
-- **Indexed colors:** Format indexed:N
-
-### 11.10 Sheet Name Sanitization
-For filenames only (NOT in data):
-- Replace invalid filename characters with underscore
-- Invalid chars: / \ : * ? " < > |
-- Collapse multiple underscores/spaces to single underscore
-- Trim underscores from start/end
+**Booleans:**
+- Use Excel's format: `TRUE` or `FALSE`
+- **Rationale:** Match Excel's representation
 
 ---
 
@@ -1058,12 +1020,11 @@ For filenames only (NOT in data):
 - **Invalid format:** Raise ValueError with format error
 
 ### 12.2 Conversion Errors (XLSB/XLS)
-- **LibreOffice not found:** Raise RuntimeError with install instructions
+- **Conversion component unavailable:** Raise RuntimeError
 - **Conversion timeout:** Raise TimeoutError
-- **Conversion failed:** Raise RuntimeError with LibreOffice error
+- **Conversion failed:** Raise RuntimeError with error details
 
 ### 12.3 Extraction Warnings
-- **Password-protected VBA:** Add warning, continue
 - **Unparseable charts:** Save raw XML, add warning
 - **Missing properties:** Use empty string, no warning
 - **Invalid cell values:** Convert to string, add warning
@@ -1087,16 +1048,11 @@ For filenames only (NOT in data):
 **File Handling:**
 - `MAX_FILE_SIZE_BYTES`: Maximum input file size (default: 200MB)
 - `TEMP_DIR`: Temporary directory for extraction (default: system temp)
-- `OUTPUT_DIR`: Output directory for snapshots (required)
+- `OUTPUT_DIR`: Output directory for flats (required)
 
 **Format Options:**
-- `INCLUDE_EVALUATED`: Extract evaluated values (default: False)
-- `INCLUDE_ORIGINAL`: Include original file in snapshot (default: True)
-- `NUMBER_PRECISION`: Max significant digits for numbers (default: 15)
-
-**Conversion:**
-- `CONVERTER_PATH`: Path to LibreOffice binary (required for XLSB/XLS)
-- `CONVERTER_TIMEOUT`: Conversion timeout in seconds (default: 300)
+- `INCLUDE_COMPUTED`: Extract computed values (default: False)
+- `INCLUDE_ORIGINAL`: Include original file in flat (default: True)
 
 **Extraction:**
 - `EXTRACTION_TIMEOUT`: Maximum extraction time (default: 900 seconds)
@@ -1113,7 +1069,6 @@ For filenames only (NOT in data):
 All configuration can be set via environment variables:
 - Prefix: `FLATTENER_`
 - Example: `FLATTENER_MAX_FILE_SIZE_BYTES=104857600`
-- Example: `FLATTENER_CONVERTER_PATH=/usr/bin/libreoffice`
 
 ### 13.3 Dependencies
 
@@ -1122,14 +1077,8 @@ All configuration can be set via environment variables:
 - `lxml>=4.9.0`: XML parsing
 - `oletools>=0.60`: VBA extraction
 
-**Optional:**
-- `pyxlsb>=1.0.10`: For direct XLSB reading (experimental)
-
 **External Dependencies:**
-- LibreOffice 7.x or newer (for XLSB/XLS conversion)
-  - Linux: `apt install libreoffice`
-  - macOS: `brew install libreoffice`
-  - Windows: Download from libreoffice.org
+- Converter component (for XLSB/XLS conversion)
 
 ---
 
@@ -1139,13 +1088,13 @@ All configuration can be set via environment variables:
 
 ```bash
 # Flatten a workbook
-excel-flattener flatten input.xlsx --output ./snapshots
+excel-flattener flatten input.xlsx --output ./flats
 
-# Flatten with evaluated values
-excel-flattener flatten input.xlsx --output ./snapshots --include-evaluated
+# Flatten with computed values
+excel-flattener flatten input.xlsx --output ./flats --include-computed
 
-# Flatten XLSB (requires LibreOffice)
-excel-flattener flatten input.xlsb --output ./snapshots --converter /usr/bin/libreoffice
+# Flatten XLSB (requires Converter component)
+excel-flattener flatten input.xlsb --output ./flats
 
 # Show version
 excel-flattener --version
@@ -1163,10 +1112,9 @@ Arguments:
   INPUT_FILE                Excel file to flatten (.xlsx, .xlsm, .xlsb, .xls)
 
 Options:
-  -o, --output DIR          Output directory for snapshot [required]
-  --include-evaluated       Include evaluated cell values
-  --no-original            Don't include original file in snapshot
-  --converter PATH         Path to LibreOffice binary
+  -o, --output DIR          Output directory for flat [required]
+  --include-computed        Include computed cell values
+  --no-original            Don't include original file in flat
   --timeout SECONDS        Extraction timeout (default: 900)
   --config FILE            Load config from file
   -v, --verbose            Verbose output
@@ -1177,12 +1125,12 @@ Options:
 ### 14.3 Command: validate
 
 ```
-Usage: excel-flattener validate [OPTIONS] SNAPSHOT_DIR
+Usage: excel-flattener validate [OPTIONS] FLAT_DIR
 
-Validate a flattened snapshot against its manifest.
+Validate a flattened output against its manifest.
 
 Arguments:
-  SNAPSHOT_DIR              Path to snapshot directory
+  FLAT_DIR                  Path to flat directory
 
 Options:
   --fix-hashes             Recompute and fix file hashes
@@ -1216,19 +1164,16 @@ from excel_flattener import Flattener
 from pathlib import Path
 
 # Create flattener
-flattener = Flattener(
-    include_evaluated=False,
-    converter_path="/usr/bin/libreoffice"
-)
+flattener = Flattener(include_computed=False)
 
 # Flatten a workbook
 result = flattener.flatten(
     input_file=Path("budget.xlsb"),
-    output_dir=Path("./snapshots")
+    output_dir=Path("./flats")
 )
 
 # Access results
-print(f"Snapshot created at: {result['snapshot_dir']}")
+print(f"Flat created at: {result['flat_dir']}")
 print(f"Original file hash: {result['manifest'].original_sha256}")
 print(f"Warnings: {result['warnings']}")
 ```
@@ -1241,15 +1186,13 @@ print(f"Warnings: {result['warnings']}")
 class Flattener:
     def __init__(
         self,
-        include_evaluated: bool = False,
-        converter_path: Optional[str] = None,
+        include_computed: bool = False,
         extraction_timeout: int = 900,
-        number_precision: int = 15,
         enable_vba: bool = True,
         enable_charts: bool = True,
         enable_tables: bool = True,
     ):
-        """Initialize the flattener with options."""
+        """Initialise the flattener with options."""
 
     def flatten(
         self,
@@ -1265,7 +1208,7 @@ class Flattener:
 
         Returns:
             Dictionary with:
-            - snapshot_dir: Path to snapshot directory
+            - flat_dir: Path to flat directory
             - manifest: Manifest object
             - original_file: Path to original file
             - warnings: List of warnings
@@ -1280,14 +1223,14 @@ class Manifest:
         self,
         workbook_filename: str,
         original_sha256: str,
-        include_evaluated: bool = False,
+        include_computed: bool = False,
     ):
-        """Initialize manifest."""
+        """Initialise manifest."""
 
     def add_sheet(self, index: int, name: str, sheetId: int, visible: bool):
         """Add sheet to manifest."""
 
-    def add_file(self, file_path: Path, snapshot_root: Path):
+    def add_file(self, file_path: Path, flat_root: Path):
         """Add file to manifest with hash."""
 
     def add_warning(self, message: str):
@@ -1321,9 +1264,10 @@ class Manifest:
 - All sheet-level features: formulas, values, formats, merges, comments
 - All workbook-level features: metadata, structure, defined names
 - VBA extraction: with and without password protection
+- Dynamic arrays: Excel 365 spill functions
 - Edge cases: empty workbooks, single-sheet, many sheets (100+)
 - Error handling: missing files, corrupt files, timeouts
-- Normalization: deterministic output (same input → same output)
+- Determinism: same input → same output (byte-for-byte)
 - Large files: performance testing up to max file size
 
 ### 16.2 Test Data
@@ -1332,6 +1276,7 @@ class Manifest:
 - `empty.xlsx`: Empty workbook
 - `simple.xlsx`: Single sheet, basic formulas and values
 - `complex.xlsm`: Multiple sheets, VBA, tables, charts
+- `dynamic-arrays.xlsx`: Excel 365 dynamic array formulas
 - `large.xlsb`: Large file (>100MB)
 - `password-protected.xlsx`: Password-protected workbook
 - `vba-protected.xlsm`: Workbook with password-protected VBA
@@ -1346,7 +1291,7 @@ result1 = flattener.flatten(input_file, output_dir1)
 result2 = flattener.flatten(input_file, output_dir2)
 
 # All files should be identical (byte-for-byte)
-assert_directories_equal(result1['snapshot_dir'], result2['snapshot_dir'])
+assert_directories_equal(result1['flat_dir'], result2['flat_dir'])
 ```
 
 **Test diff-friendliness:**
@@ -1356,7 +1301,7 @@ result_v1 = flattener.flatten(workbook_v1, output_dir1)
 result_v2 = flattener.flatten(workbook_v2, output_dir2)
 
 # Diff should only show changed cells
-diff = compute_directory_diff(result_v1['snapshot_dir'], result_v2['snapshot_dir'])
+diff = compute_directory_diff(result_v1['flat_dir'], result_v2['flat_dir'])
 assert len(diff) == expected_changes
 ```
 
@@ -1373,11 +1318,11 @@ assert len(diff) == expected_changes
 - Maximum file (200MB): <15 minutes
 
 **Bottlenecks:**
-- LibreOffice conversion (XLSB): ~10-60 seconds
+- Format conversion (XLSB): Handled by Converter component
 - VBA extraction: ~1-5 seconds
 - Large sheets (>100K cells): Memory usage
 
-### 17.2 Optimization Strategies
+### 17.2 Optimisation Strategies
 
 **Memory:**
 - Stream large files when possible
@@ -1389,7 +1334,6 @@ assert len(diff) == expected_changes
 - Skip empty rows/columns
 - Only extract cells with content or formatting
 - Parallel extraction of sheets (optional)
-- Cache LibreOffice conversions (optional)
 
 ---
 
@@ -1397,21 +1341,21 @@ assert len(diff) == expected_changes
 
 ### 18.1 Flattener Version
 
-- **Current version:** 2.0.0
+- **Current version:** 2.1.0
 - **Versioning scheme:** Semantic versioning (MAJOR.MINOR.PATCH)
 - **Version in manifest:** Always record extractor version
-- **Backward compatibility:** Flattener 2.x can read any 2.x snapshot
+- **Backward compatibility:** Flattener 2.x can read any 2.x flat
 
 ### 18.2 Format Stability
 
 **Stable (won't change):**
 - Manifest JSON schema (only additions allowed)
 - File naming conventions
-- Core normalization rules (formulas, numbers, dates)
+- Core extraction rules (minimal normalisation)
 
 **Unstable (may change):**
 - Exact file format details (e.g., adding new columns)
-- Chart/pivot/table formats (not yet implemented)
+- Chart/pivot/table formats
 - Warning messages
 
 **Deprecation policy:**
@@ -1421,28 +1365,7 @@ assert len(diff) == expected_changes
 
 ---
 
-## 19. Future Enhancements (Out of Scope for v2.0)
-
-### 19.1 Advanced Features
-- Recompute formula values (requires full calculation engine)
-- Support for Excel 365 features (dynamic arrays, LAMBDA, etc.)
-- Extract embedded objects (images, OLE objects)
-- Extract sparklines
-- Extract conditional formatting rules (detailed)
-
-### 19.2 Performance
-- Parallel sheet extraction
-- Incremental extraction (only changed sheets)
-- Caching of converted files
-
-### 19.3 Formats
-- Support for Google Sheets export
-- Support for Numbers (Apple)
-- Support for LibreOffice Calc
-
----
-
-## 20. Success Criteria
+## 19. Success Criteria
 
 **The flattener is successful if:**
 
@@ -1465,88 +1388,29 @@ assert len(diff) == expected_changes
 | original/<file> | Original binary | Binary | YES | N/A |
 | workbook/metadata.txt | Workbook properties | Key-value | YES | By key |
 | workbook/structure.txt | Sheet list | Tab-delimited | YES | By index |
-| workbook/defined_names.txt | Named ranges | Tab-delimited | YES | By scope, name |
-| workbook/calculation_chain.txt | Calc order | List | NO | Calc order |
-| workbook/external_links.txt | External refs | Tab-delimited | NO | By ID |
-| workbook/connections.txt | Data connections | Tab-delimited | NO | By name |
-| workbook/addins.txt | Add-in refs | List | NO | Alphabetical |
+| workbook/defined-names.txt | Named ranges | Tab-delimited | YES | By scope, name |
+| workbook/calculation-chain.txt | Calc order | List | YES | Calc order |
+| workbook/external-links.txt | External refs | Tab-delimited | YES | By ID |
+| workbook/connections.txt | Data connections | Tab-delimited | YES | By name |
+| workbook/addins.txt | Add-in refs | List | YES | Alphabetical |
 | sheets/<NN>.<Name>.metadata.json | Sheet properties | JSON | YES | N/A |
 | sheets/<NN>.<Name>.formulas.txt | Formula cells | Tab-delimited | YES | Row-major |
-| sheets/<NN>.<Name>.values_hardcoded.txt | Non-formula values | Tab-delimited | YES | Row-major |
-| sheets/<NN>.<Name>.values_evaluated.txt | All values | Tab-delimited | NO | Row-major |
-| sheets/<NN>.<Name>.cell_formats.txt | Cell formatting | Tab-delimited | YES | Row-major |
-| sheets/<NN>.<Name>.merged_ranges.txt | Merged cells | List | YES | Lexicographic |
-| sheets/<NN>.<Name>.data_validations.txt | Validation rules | Tab-delimited | YES | By range |
+| sheets/<NN>.<Name>.literal-values.txt | Non-formula values | Tab-delimited | YES | Row-major |
+| sheets/<NN>.<Name>.computed-values.txt | All values | Tab-delimited | OPTIONAL | Row-major |
+| sheets/<NN>.<Name>.cell-formats.txt | Cell formatting | Tab-delimited | YES | Row-major |
+| sheets/<NN>.<Name>.merged-ranges.txt | Merged cells | List | YES | Lexicographic |
+| sheets/<NN>.<Name>.data-validations.txt | Validation rules | Tab-delimited | YES | By range |
 | sheets/<NN>.<Name>.comments.txt | Cell comments | Tab-delimited | YES | Row-major |
-| tables/<Name>.definition.txt | Table structure | Text | NO | N/A |
-| charts/<Name>.metadata.txt | Chart definition | Text | NO | N/A |
-| charts/<Name>.xml | Raw chart XML | XML | NO | N/A |
-| pivots/<Name>.definition.txt | Pivot structure | Text | NO | N/A |
+| tables/<Name>.definition.txt | Table structure | Text | YES | N/A |
+| charts/<Name>.metadata.txt | Chart definition | Text | YES | N/A |
+| charts/<Name>.xml | Raw chart XML | XML | YES | N/A |
+| pivots/<Name>.definition.txt | Pivot structure | Text | YES | N/A |
 | vba/vbaProject.bin | VBA binary | Binary | IF VBA | N/A |
 | vba/<Name>.bas/cls/frm | VBA modules | VBA code | IF VBA | Alphabetical |
-| styles/cell_styles.txt | Named styles | Text | NO | By name |
-| styles/number_formats.txt | Custom formats | Tab-delimited | NO | By ID |
-| styles/theme.txt | Theme definition | Text | NO | N/A |
+| styles/cell-styles.txt | Named styles | Text | YES | By name |
+| styles/number-formats.txt | Custom formats | Tab-delimited | YES | By ID |
+| styles/theme.txt | Theme definition | Text | YES | N/A |
 | logs/extraction.log | Extraction log | Text | YES | N/A |
-
----
-
-## Appendix B: Example Complete Snapshot
-
-```
-budget-snapshot-20251027T143022Z-a3f5c8d1/
-├── manifest.json
-├── original/
-│   └── budget.xlsb
-├── workbook/
-│   ├── metadata.txt
-│   ├── structure.txt
-│   ├── defined_names.txt
-│   ├── calculation_chain.txt
-│   ├── external_links.txt
-│   ├── connections.txt
-│   └── addins.txt
-├── sheets/
-│   ├── 01.Dashboard.metadata.json
-│   ├── 01.Dashboard.formulas.txt
-│   ├── 01.Dashboard.values_hardcoded.txt
-│   ├── 01.Dashboard.cell_formats.txt
-│   ├── 01.Dashboard.merged_ranges.txt
-│   ├── 01.Dashboard.data_validations.txt
-│   ├── 01.Dashboard.comments.txt
-│   ├── 02.Data.metadata.json
-│   ├── 02.Data.formulas.txt
-│   ├── 02.Data.values_hardcoded.txt
-│   ├── 02.Data.cell_formats.txt
-│   ├── 02.Data.merged_ranges.txt
-│   ├── 02.Data.data_validations.txt
-│   └── 02.Data.comments.txt
-├── tables/
-│   ├── SalesTable.definition.txt
-│   └── SalesTable.data.csv
-├── charts/
-│   ├── RevenueTrend.metadata.txt
-│   └── RevenueTrend.xml
-├── pivots/
-│   └── SalesAnalysis.definition.txt
-├── vba/
-│   ├── vbaProject.bin
-│   ├── Module1.bas
-│   └── ThisWorkbook.cls
-├── styles/
-│   ├── cell_styles.txt
-│   ├── number_formats.txt
-│   └── theme.txt
-└── logs/
-    └── extraction.log
-```
-
----
-
-## Document History
-
-- **2025-10-29:** Version 2.0 - Complete rewrite for standalone flattener
-- **2025-10-27:** Version 1.0 - Initial specification (integrated with API)
 
 ---
 

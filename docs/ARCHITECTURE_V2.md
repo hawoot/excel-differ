@@ -1,6 +1,6 @@
 # Excel Differ - Modular Architecture
 
-**Version:** 2.0
+**Version:** 2.1
 **Date:** 2025-10-29
 **Status:** Design Document
 
@@ -8,12 +8,12 @@
 
 ## 1. Overview
 
-The Excel Differ system is designed as a **modular, composable architecture** where each component can function independently or be combined into larger systems. This design enables:
+The Excel Differ system is designed as a **modular, composable architecture** where each component functions independently and is coordinated by an orchestrator. This design enables:
 
 - **Independent development and deployment** of each component
-- **Flexible integration** patterns (CLI, API, library)
+- **Clear workflow orchestration** for automated processing
 - **Easy testing** of individual components
-- **Clear separation of concerns**
+- **Flexible integration** patterns (CLI, API, library)
 
 ---
 
@@ -22,54 +22,96 @@ The Excel Differ system is designed as a **modular, composable architecture** wh
 ### 2.1 Component Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    EXCEL DIFFER SYSTEM                       │
-└─────────────────────────────────────────────────────────────┘
-                              │
-        ┌─────────────────────┼─────────────────────┐
-        │                     │                     │
-        ▼                     ▼                     ▼
-┌──────────────┐      ┌──────────────┐     ┌──────────────┐
-│  FLATTENER   │      │   CONVERTER  │     │ GIT HANDLER  │
-│  Component   │◄────►│   Component  │     │  Component   │
-└──────────────┘      └──────────────┘     └──────────────┘
-        │                                            │
-        └─────────────────┬──────────────────────────┘
-                          ▼
-                  ┌──────────────┐
-                  │    DIFFER    │
-                  │  Component   │
-                  └──────────────┘
-                          │
-        ┌─────────────────┼─────────────────┐
-        ▼                 ▼                 ▼
-┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-│  CLI Layer   │  │  API Layer   │  │ Library API  │
-└──────────────┘  └──────────────┘  └──────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                    ORCHESTRATOR                          │
+│         (Main workflow coordination component)           │
+└─────────────────┬───────────────────────────────────────┘
+                  │
+                  │ Coordinates workflow:
+                  │ 1. Check for new files (Git)
+                  │ 2. Download if needed (Git)
+                  │ 3. Flatten each file (Flattener)
+                  │ 4. Upload flats (Git)
+                  │
+     ┌────────────┼────────────┬──────────────┐
+     │            │            │              │
+     ▼            ▼            ▼              ▼
+┌─────────┐  ┌─────────┐  ┌──────────┐  ┌─────────┐
+│   GIT   │  │FLATTENER│  │CONVERTER │  │  DIFFER │
+│Component│  │Component│  │Component │  │Component│
+└─────────┘  └────┬────┘  └──────────┘  └─────────┘
+     │            │
+     │            └──────► Uses Converter for XLSB/XLS
+     │
+     └──────► Download/Upload files and folders
 ```
 
 ---
 
 ## 3. Component Specifications
 
-### 3.1 Flattener Component
+### 3.1 Git Component
+
+**Purpose:** Handle all Git operations for downloading and uploading Excel files and flattened outputs.
+
+**Responsibilities:**
+- Check remote repository for new or changed Excel files
+- Download Excel files from repository
+- Upload flattened directories to repository
+- Handle Git authentication (SSH keys, tokens)
+- Manage branches (same or different for source/flats)
+- Handle concurrent operations and conflicts
+
+**Key Operations:**
+- `check_for_new_files(repo_url, branch, file_patterns)` → List of changed files
+- `download_files(repo_url, branch, file_paths, local_dir)` → Downloaded file paths
+- `upload_directory(local_dir, repo_url, branch, commit_message)` → Commit SHA
+- `clone_or_pull(repo_url, branch, local_dir)` → Repository state
+- `list_files(repo_url, branch, file_patterns)` → File inventory
+
+**Inputs:**
+- Repository URL (SSH or HTTPS)
+- Branch name
+- Authentication credentials
+- File patterns to match (e.g., `*.xlsx`, `*.xlsm`)
+- Commit metadata
+
+**Outputs:**
+- List of changed/new files
+- Downloaded files
+- Commit SHA for uploads
+- Repository state information
+
+**Dependencies:**
+- Python library: GitPython
+- System: git binary
+- SSH keys or access tokens for authentication
+
+**Interfaces:**
+- Python API: `GitComponent.check_for_new_files()`, `GitComponent.download_files()`, etc.
+- CLI: `excel-git check-new <repo> --branch main`
+
+**Status:** 🔴 **TO BE SPECIFIED IN DETAIL**
+
+---
+
+### 3.2 Flattener Component
 
 **Purpose:** Transform binary Excel workbooks into deterministic text representations.
 
 **Responsibilities:**
 - Load and parse Excel files (.xlsx, .xlsm, .xlsb, .xls)
 - Extract all content (formulas, values, formatting, VBA, etc.)
-- Normalize data for deterministic output
 - Generate structured text files and manifest
-- Handle conversion of legacy formats
+- Handle conversion requirements for binary formats
 
 **Inputs:**
 - Excel file path (any supported format)
-- Configuration options (include_evaluated, etc.)
+- Configuration options (include_computed, etc.)
 - Optional origin metadata (repo, commit, path)
 
 **Outputs:**
-- Snapshot directory with structured text files
+- Flat directory with structured text files
 - Manifest JSON with metadata and file inventory
 - Warnings/errors list
 
@@ -81,67 +123,56 @@ The Excel Differ system is designed as a **modular, composable architecture** wh
 - Python API: `Flattener.flatten(input_file, **options)`
 - CLI: `excel-flattener flatten <file> --output <dir>`
 
-**Status:** ✅ **PRIMARY FOCUS FOR CURRENT IMPLEMENTATION**
-
-**Specification:** See [FLATTENER_SPECS.md](FLATTENER_SPECS.md)
+**Status:** ✅ **FULLY SPECIFIED** - See [FLATTENER_SPECS.md](FLATTENER_SPECS.md)
 
 ---
 
-### 3.2 Converter Component
+### 3.3 Converter Component
 
 **Purpose:** Convert legacy Excel formats to modern OOXML format.
 
 **Responsibilities:**
-- Convert .xlsb → .xlsm using LibreOffice
-- Convert .xls → .xlsx using LibreOffice
+- Convert .xlsb → .xlsm
+- Convert .xls → .xlsx
 - Validate conversion success
 - Handle conversion timeouts and errors
-- Cache converted files (optional)
+- Optional file caching
 
 **Inputs:**
 - Excel file path (.xlsb or .xls)
-- Converter path (LibreOffice binary)
-- Timeout configuration
+- Conversion configuration (tool path, timeout)
 
 **Outputs:**
 - Converted file path (.xlsm or .xlsx)
 - Conversion status and errors
 
 **Dependencies:**
-- External: LibreOffice (headless mode)
+- External tool (e.g., LibreOffice headless mode)
 - System: subprocess, temp directory
 
 **Interfaces:**
 - Python API: `Converter.convert(input_file, output_dir)`
 - CLI: `excel-converter convert <file> --output <dir>`
 
-**Current Implementation:** Embedded in flattener (`converter.py`)
+**Implementation Details:** To be defined by this component (not specified here)
 
-**Future:** Extract to standalone component
-
-**Status:** ⚠️ **SPECIFIED BUT NOT YET SEPARATED**
-
-**Key Design Questions:**
-- Should conversion be synchronous or async?
-- Should we cache converted files? Where? For how long?
-- Should we support other conversion tools (e.g., python-xlsb)?
-- How do we handle platform differences (Linux/Windows/macOS)?
+**Status:** 🔴 **TO BE SPECIFIED IN DETAIL**
 
 ---
 
-### 3.3 Differ Component
+### 3.4 Differ Component
 
-**Purpose:** Compare two flattened snapshots and generate structured diff output.
+**Purpose:** Compare two flattened outputs and generate structured diff.
 
 **Responsibilities:**
-- Load two snapshot directories and their manifests
+- Load two flat directories and their manifests
 - Compare files and detect changes (added, removed, modified)
 - Generate structured JSON diff (typed changes)
 - Generate unified text diff (git-style patch)
 - Provide diff statistics and summary
 
 **Inputs:**
-- Two snapshot directory paths
+- Two flat directory paths
 - Comparison options (context lines, output format)
 
 **Outputs:**
@@ -154,267 +185,224 @@ The Excel Differ system is designed as a **modular, composable architecture** wh
 - Flattener manifests for file inventory
 
 **Interfaces:**
-- Python API: `Differ.compare(snapshot_a, snapshot_b, **options)`
-- CLI: `excel-differ compare <snapshot_a> <snapshot_b>`
+- Python API: `Differ.compare(flat_a, flat_b, **options)`
+- CLI: `excel-differ compare <flat_a> <flat_b>`
 
-**Status:** 🔴 **NOT YET SPECIFIED OR IMPLEMENTED**
-
-**Key Design Questions:**
-- Should differ work on snapshots only, or also accept raw Excel files?
-- How to handle moved/renamed sheets?
-- How to handle large diffs (100K+ cell changes)?
-- Should we provide visual diff output (HTML/web)?
+**Status:** 🔴 **TO BE SPECIFIED IN DETAIL**
 
 ---
 
-### 3.4 Git Handler Component
+### 3.5 Orchestrator Component
 
-**Purpose:** Integrate flattened snapshots with Git repositories.
+**Purpose:** Coordinate the complete workflow: check for new files, download, flatten, upload.
 
 **Responsibilities:**
-- Clone and manage snapshot repository
-- Commit flattened snapshots with metadata
-- Create and manage branches
-- Handle concurrent commits with retry logic
-- Query snapshot history
+- Manage overall workflow execution
+- Call Git component to check for new Excel files
+- Download new/changed files
+- Call Flattener for each Excel file
+- Collect all flattened outputs
+- Upload flats to repository (same or different repo/branch)
+- Handle errors and retries
+- Provide progress reporting
+
+**Workflow:**
+```
+1. Orchestrator calls Git.check_for_new_files(source_repo, source_branch, patterns)
+   → Returns: List of new/changed Excel files
+
+2. If no new files:
+   → Done (exit)
+
+3. If new files found:
+   → Orchestrator calls Git.download_files(source_repo, source_branch, file_list, temp_dir)
+   → Returns: Local paths to downloaded Excel files
+
+4. For each downloaded Excel file:
+   → Orchestrator calls Flattener.flatten(file_path, output_dir)
+   → Returns: Flat directory path, manifest, warnings
+
+5. After all files flattened:
+   → Orchestrator calls Git.upload_directory(flats_dir, target_repo, target_branch, message)
+   → Returns: Commit SHA
+
+6. Done
+```
+
+**Configuration:**
+- Source repository (where Excel files live)
+- Source branch
+- Target repository (where flats go, can be same as source)
+- Target branch (can be same or different from source)
+- File patterns to monitor (e.g., `**/*.xlsx`, `**/*.xlsm`)
+- Flattener options (include_computed, etc.)
 
 **Inputs:**
-- Snapshot directory
-- Repository URL and credentials
-- Commit metadata (message, author, origin)
+- Configuration file or environment variables
+- Optional: Specific files to process (bypass change detection)
 
 **Outputs:**
-- Commit SHA
-- Updated repository state
-- Errors and warnings
+- Processing summary (files processed, warnings, commit SHA)
+- Logs of all operations
+- Exit status (success/failure)
 
-**Dependencies:**
-- Python library: GitPython
-- System: git binary
-
-**Interfaces:**
-- Python API: `GitHandler.commit_snapshot(snapshot_dir, repo_url, **metadata)`
-- CLI: `excel-git commit <snapshot_dir> --repo <url>`
-
-**Status:** 🔴 **NOT YET SPECIFIED**
-
-**Key Design Questions:**
-- Where to store snapshot repos (local cache vs remote-only)?
-- How to organize snapshots in git (directory structure)?
-- How to handle large binary files (Git LFS)?
-- Should we support GitHub/GitLab API integration (PRs, issues)?
-
----
-
-### 3.5 API Server Component
-
-**Purpose:** Provide HTTP REST API for all components.
-
-**Responsibilities:**
-- Accept file uploads and job submissions
-- Queue and execute async jobs (flatten, compare, commit)
-- Return job status and results
-- Stream large results (archives, diffs)
-- Handle authentication and rate limiting
-
-**Inputs:**
-- HTTP requests (POST /flatten, POST /compare, GET /jobs/{id})
-- Configuration (ports, storage paths, timeouts)
-
-**Outputs:**
-- HTTP responses (JSON, file streams)
-- Job status updates
-- Stored results (temp files, archives)
-
-**Dependencies:**
-- Web framework: FastAPI
-- Job queue: Celery or multiprocessing
-- Storage: filesystem or S3
+**Error Handling:**
+- Continue processing other files if one fails
+- Collect all errors and warnings
+- Report summary at end
+- Non-zero exit code if any errors
 
 **Interfaces:**
-- REST API endpoints (see original requirements doc)
-- Webhooks/callbacks for job completion
+- Python API: `Orchestrator.run(config)`
+- CLI: `excel-orchestrator run --config config.yaml`
+- CLI: `excel-orchestrator run --source-repo <url> --target-repo <url>`
 
-**Status:** 🔴 **NOT YET SPECIFIED FOR V2**
-
-**Key Design Questions:**
-- Authentication strategy (API keys, OAuth, mTLS)?
-- Job queue implementation (Celery, RQ, or custom)?
-- Storage strategy (local filesystem, S3, database)?
-- Deployment model (Docker, k8s, serverless)?
+**Status:** 🔴 **TO BE SPECIFIED IN DETAIL**
 
 ---
 
-## 4. Component Interaction Patterns
+## 4. Component Interaction Workflow
 
-### 4.1 Flatten Workflow
-
-```
-User
-  │
-  ├─→ Flattener.flatten(file.xlsb)
-  │     │
-  │     ├─→ Converter.convert(file.xlsb) → file.xlsm
-  │     │
-  │     ├─→ Extract workbook metadata
-  │     ├─→ Extract sheets
-  │     ├─→ Extract VBA
-  │     ├─→ Generate manifest
-  │     │
-  │     └─→ Return: snapshot_dir
-  │
-  └─→ Receive: snapshot_dir, manifest, warnings
-```
-
-**Key Points:**
-- Flattener depends on Converter (composition)
-- Converter is optional (only needed for XLSB/XLS)
-- All extraction happens synchronously in-process
-
----
-
-### 4.2 Compare Workflow
-
-```
-User
-  │
-  ├─→ Differ.compare(file_a.xlsx, file_b.xlsx)
-  │     │
-  │     ├─→ Flattener.flatten(file_a.xlsx) → snapshot_a
-  │     │
-  │     ├─→ Flattener.flatten(file_b.xlsx) → snapshot_b
-  │     │
-  │     ├─→ Load manifests
-  │     ├─→ Compare files (formula, values, formats, etc.)
-  │     ├─→ Generate JSON diff
-  │     ├─→ Generate unified diff
-  │     │
-  │     └─→ Return: diff_json, diff_unified, summary
-  │
-  └─→ Receive: structured diff
-```
-
-**Key Points:**
-- Differ depends on Flattener (composition)
-- Differs works on snapshot directories (not raw Excel)
-- Can also accept pre-flattened snapshots (skip flatten step)
-
----
-
-### 4.3 Git Commit Workflow
-
-```
-User/CI Hook
-  │
-  ├─→ GitHandler.commit_snapshot(file.xlsx, repo_url, metadata)
-  │     │
-  │     ├─→ Flattener.flatten(file.xlsx) → snapshot_dir
-  │     │
-  │     ├─→ Clone/pull repo (if not cached)
-  │     │
-  │     ├─→ Copy snapshot to repo path
-  │     │
-  │     ├─→ git add, commit, push
-  │     │     ├─→ Retry on conflict
-  │     │     └─→ Handle errors
-  │     │
-  │     └─→ Return: commit_sha, repo_path
-  │
-  └─→ Receive: commit info
-```
-
-**Key Points:**
-- Git Handler depends on Flattener
-- Handles repository state management
-- Provides atomic commit operations
-- Handles concurrency and conflicts
-
----
-
-### 4.4 API Server Workflow
-
-```
-Client (curl/browser)
-  │
-  ├─→ POST /api/v1/flatten (upload file)
-  │     │
-  │     ├─→ Validate request
-  │     ├─→ Create job
-  │     ├─→ Return: 202 Accepted, job_id
-  │     │
-  │     └─→ [Background Worker]
-  │           │
-  │           ├─→ Flattener.flatten(file) → snapshot
-  │           ├─→ Archive snapshot → zip
-  │           ├─→ Store result
-  │           └─→ Mark job complete
-  │
-  ├─→ GET /api/v1/jobs/{job_id}
-  │     │
-  │     └─→ Return: job status, result (if complete)
-  │
-  └─→ GET /api/v1/results/{job_id}/download
-        │
-        └─→ Stream: snapshot.zip
-```
-
-**Key Points:**
-- API Server orchestrates all components
-- Uses async job queue for long-running tasks
-- Provides HTTP interface to all functionality
-- Handles state management and cleanup
-
----
-
-## 5. Data Flow
-
-### 5.1 File Processing Pipeline
+### 4.1 Automated Workflow (Orchestrator-Driven)
 
 ```
 ┌──────────────┐
-│ Excel File   │
-│ (.xlsb/.xlsx)│
+│ Orchestrator │
 └──────┬───────┘
        │
-       ▼
-┌──────────────┐
-│  Converter   │ (if needed)
-│ .xlsb→.xlsm  │
-└──────┬───────┘
+       ├─→ 1. Check for new Excel files
+       │   Git.check_for_new_files(repo, branch, "**/*.xlsx")
+       │   → ["finance/budget.xlsx", "sales/report.xlsm"]
        │
-       ▼
-┌──────────────┐
-│  Flattener   │
-│  Extract &   │
-│  Normalize   │
-└──────┬───────┘
+       ├─→ 2. Download new files (if any)
+       │   Git.download_files(repo, branch, file_list, "./temp")
+       │   → ["./temp/budget.xlsx", "./temp/report.xlsm"]
        │
-       ▼
-┌──────────────┐
-│  Snapshot    │
-│  Directory   │
-│  + Manifest  │
-└──────┬───────┘
+       ├─→ 3. Flatten each file
+       │   Flattener.flatten("./temp/budget.xlsx", "./flats")
+       │   → {"flat_dir": "./flats/budget-flat-...", "warnings": []}
        │
-       ├─────────────┬──────────────┐
-       │             │              │
-       ▼             ▼              ▼
-  ┌─────────┐  ┌─────────┐  ┌─────────┐
-  │ Git     │  │ Differ  │  │ Archive │
-  │ Commit  │  │ Compare │  │ (ZIP)   │
-  └─────────┘  └─────────┘  └─────────┘
+       │   Flattener.flatten("./temp/report.xlsm", "./flats")
+       │   → {"flat_dir": "./flats/report-flat-...", "warnings": []}
+       │
+       └─→ 4. Upload all flats
+           Git.upload_directory("./flats", target_repo, branch, "Add flats for 2 files")
+           → "commit_sha: abc123..."
+```
+
+**Key Points:**
+- Orchestrator coordinates entire workflow
+- Each component is called in sequence
+- Errors at any stage are collected and reported
+- Workflow can run unattended (CI/CD, cron job)
+
+---
+
+### 4.2 Manual Workflow (Direct Component Usage)
+
+**Flatten a single file:**
+```python
+from excel_flattener import Flattener
+
+flattener = Flattener()
+result = flattener.flatten("budget.xlsx", output_dir="./flats")
+print(f"Flat created: {result['flat_dir']}")
+```
+
+**Compare two files:**
+```python
+from excel_flattener import Flattener
+from excel_differ import Differ
+
+flattener = Flattener()
+flat_a = flattener.flatten("old.xlsx", "./temp/a")
+flat_b = flattener.flatten("new.xlsx", "./temp/b")
+
+differ = Differ()
+diff = differ.compare(flat_a['flat_dir'], flat_b['flat_dir'])
+print(f"Formulas changed: {diff['summary']['formulas_changed']}")
+```
+
+**Git operations:**
+```python
+from excel_git import GitComponent
+
+git = GitComponent(auth_token="...")
+new_files = git.check_for_new_files(
+    repo_url="git@github.com:org/repo.git",
+    branch="main",
+    patterns=["**/*.xlsx"]
+)
+print(f"New files: {new_files}")
 ```
 
 ---
 
-## 6. Storage Architecture
+### 4.3 Orchestrator Configuration Example
 
-### 6.1 Directory Structure (Proposed)
+**File: `config.yaml`**
+```yaml
+# Source repository (where Excel files are)
+source:
+  repo_url: git@github.com:company/excel-files.git
+  branch: main
+  patterns:
+    - "**/*.xlsx"
+    - "**/*.xlsm"
+    - "**/*.xlsb"
+  auth:
+    type: ssh_key
+    key_path: ~/.ssh/id_rsa
+
+# Target repository (where flats go)
+target:
+  repo_url: git@github.com:company/excel-flats.git  # Can be same as source
+  branch: flats                                      # Can be different branch
+  auth:
+    type: ssh_key
+    key_path: ~/.ssh/id_rsa
+
+# Flattener options
+flattener:
+  include_computed: false
+  extraction_timeout: 900
+
+# Orchestrator options
+orchestrator:
+  continue_on_error: true   # Keep processing other files if one fails
+  temp_dir: /tmp/excel-orchestrator
+  max_concurrent: 1         # Process files one at a time (for now)
+```
+
+**Usage:**
+```bash
+# Run orchestrator with config file
+excel-orchestrator run --config config.yaml
+
+# Or via environment variables
+EXCEL_SOURCE_REPO="git@github.com:company/excel-files.git" \
+EXCEL_SOURCE_BRANCH="main" \
+EXCEL_TARGET_REPO="git@github.com:company/excel-flats.git" \
+EXCEL_TARGET_BRANCH="flats" \
+excel-orchestrator run
+
+# Or as one-off command
+excel-orchestrator run \
+  --source-repo git@github.com:company/excel-files.git \
+  --source-branch main \
+  --target-repo git@github.com:company/excel-flats.git \
+  --target-branch flats \
+  --patterns "**/*.xlsx"
+```
+
+---
+
+## 5. Directory Structure (Proposed)
 
 ```
 excel-differ/
 ├── components/
-│   ├── flattener/              # Flattener component (CURRENT FOCUS)
+│   ├── flattener/              # Flattener component (PRIMARY FOCUS)
 │   │   ├── src/
 │   │   │   ├── __init__.py
 │   │   │   ├── flattener.py
@@ -443,23 +431,17 @@ excel-differ/
 │   │   ├── pyproject.toml
 │   │   └── README.md
 │   │
-│   └── git-handler/            # Git Handler component (FUTURE)
-│       ├── src/
-│       ├── tests/
-│       ├── docs/
-│       ├── pyproject.toml
-│       └── README.md
-│
-├── applications/
-│   ├── cli/                    # Command-line application
+│   ├── git/                    # Git component (FUTURE)
 │   │   ├── src/
-│   │   │   └── main.py
+│   │   ├── tests/
+│   │   ├── docs/
 │   │   ├── pyproject.toml
 │   │   └── README.md
 │   │
-│   └── api-server/             # API server application (FUTURE)
+│   └── orchestrator/           # Orchestrator component (FUTURE)
 │       ├── src/
-│       ├── docker/
+│       ├── tests/
+│       ├── docs/
 │       ├── pyproject.toml
 │       └── README.md
 │
@@ -473,213 +455,510 @@ excel-differ/
 │
 ├── docs/                       # System-wide documentation
 │   ├── ARCHITECTURE_V2.md      # This file
-│   └── FLATTENER_SPECS.md      # Component specs
+│   └── FLATTENER_SPECS.md      # Flattener specs
 │
 └── README.md                   # Project overview
 ```
 
 ---
 
-## 7. Open Questions for User
+## 6. Deployment Models
 
-### 7.1 Platform & Environment
+### 6.1 Standalone Library (Current Focus)
 
-**Questions:**
-1. **What platform(s) will you primarily use?**
-   - Windows with Excel installed?
-   - Linux server without Excel?
-   - Both?
+**Use Case:** Import flattener as Python library in your code.
 
-2. **Is LibreOffice available?**
-   - Can you install it?
-   - Do you have admin rights?
-   - If not, can you avoid XLSB files?
+```python
+from excel_flattener import Flattener
 
-3. **What errors did you encounter with named ranges?**
-   - Can you provide specific examples?
-   - Were they extraction errors or diff errors?
-   - What types of named ranges caused issues?
+flattener = Flattener()
+result = flattener.flatten("budget.xlsx", output_dir="./flats")
+```
 
-### 7.2 Use Cases & Requirements
-
-**Questions:**
-4. **What's your primary use case?**
-   - Just flatten Excel files to text?
-   - Compare versions and see diffs?
-   - Track changes in git?
-   - All of the above?
-
-5. **Do you need evaluated values?**
-   - Or are formulas and hardcoded values enough?
-   - Are cached values acceptable (not recomputed)?
-
-6. **What Excel features do you actually use?**
-   - VBA macros?
-   - Charts and pivots?
-   - Tables?
-   - Data connections?
-   - Complex formatting?
-
-### 7.3 Deployment & Integration
-
-**Questions:**
-7. **How will you use the flattener?**
-   - As a Python library in your code?
-   - As a command-line tool?
-   - Via an API server?
-
-8. **Do you want git integration?**
-   - Automatic commits to a snapshot repo?
-   - Manual workflow (you handle git)?
-
-9. **Do you need the differ component?**
-   - Or can you use git diff on the flattened files?
-   - Need structured JSON output?
+**Deployment:**
+- Install: `pip install excel-flattener`
+- Dependencies: Python 3.9+, openpyxl, lxml, oletools
 
 ---
 
-## 8. Implementation Priorities
+### 6.2 Command-Line Tool
 
-### 8.1 Phase 1: Standalone Flattener (CURRENT)
+**Use Case:** Run components from terminal/scripts.
+
+```bash
+# Flatten a file
+excel-flattener flatten budget.xlsx --output ./flats
+
+# Check for new files in repo
+excel-git check-new git@github.com:org/repo.git --branch main
+
+# Run orchestrator
+excel-orchestrator run --config config.yaml
+```
+
+**Deployment:**
+- Install: `pip install excel-differ[cli]`
+- Use in CI/CD scripts, git hooks, automation
+
+---
+
+### 6.3 CI/CD Integration (Future)
+
+**GitHub Actions Workflow:**
+
+```yaml
+name: Excel Flattening Workflow
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**.xlsx'
+      - '**.xlsm'
+
+jobs:
+  flatten:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Excel Differ
+        run: pip install excel-differ
+
+      - name: Run Orchestrator
+        env:
+          SOURCE_REPO: ${{ github.repository }}
+          TARGET_REPO: ${{ github.repository }}
+          TARGET_BRANCH: flats
+        run: |
+          excel-orchestrator run \
+            --source-repo $SOURCE_REPO \
+            --source-branch main \
+            --target-repo $TARGET_REPO \
+            --target-branch flats
+
+      - name: Report Results
+        run: echo "Processing complete"
+```
+
+---
+
+## 7. Configuration Management
+
+### 7.1 Configuration Hierarchy
+
+```
+1. Defaults (in code)
+   ↓
+2. System config file (/etc/excel-differ/config.yaml)
+   ↓
+3. User config file (~/.excel-differ/config.yaml)
+   ↓
+4. Project config file (./excel-differ.yaml)
+   ↓
+5. Environment variables (EXCEL_*)
+   ↓
+6. Command-line arguments
+```
+
+**Later settings override earlier settings.**
+
+---
+
+### 7.2 Configuration Format
+
+**File: excel-differ.yaml**
+
+```yaml
+# Flattener settings
+flattener:
+  include_computed: false
+  extraction_timeout: 900
+  enable_vba: true
+  enable_charts: true
+  enable_tables: true
+
+# Converter settings (future)
+converter:
+  tool: libreoffice
+  timeout: 300
+
+# Git settings
+git:
+  source:
+    repo_url: git@github.com:company/excel-files.git
+    branch: main
+    patterns: ["**/*.xlsx", "**/*.xlsm"]
+  target:
+    repo_url: git@github.com:company/excel-flats.git
+    branch: flats
+  auth:
+    type: ssh_key
+    key_path: ~/.ssh/id_rsa
+
+# Orchestrator settings
+orchestrator:
+  continue_on_error: true
+  temp_dir: /tmp/excel-orchestrator
+  max_concurrent: 1
+
+# Storage settings
+storage:
+  temp_dir: /tmp/excel-differ
+  output_dir: ./flats
+  max_file_size: 209715200  # 200 MB
+
+# Logging
+logging:
+  level: INFO
+  file: excel-differ.log
+  format: json
+```
+
+---
+
+## 8. Error Handling Strategy
+
+### 8.1 Error Categories
+
+**Input Errors:**
+- File not found
+- Invalid file format
+- File too large
+- Password-protected workbook
+
+**Response:** Clear error message, exit code 1, suggest fix.
+
+**Configuration Errors:**
+- Missing dependencies
+- Invalid config file
+- Insufficient permissions
+- Git authentication failure
+
+**Response:** Error message with setup instructions, exit code 2.
+
+**Processing Errors:**
+- Corrupt Excel file
+- Timeout during extraction
+- Out of memory
+- Git operation failure
+
+**Response:** Error message, partial results if possible, exit code 3.
+
+**System Errors:**
+- Disk full
+- Network timeout
+- External tool crash
+
+**Response:** Error message, suggest retry, exit code 4.
+
+---
+
+### 8.2 Orchestrator Error Handling
+
+**Philosophy:** Fail gracefully, continue processing when possible.
+
+```python
+# Orchestrator pseudo-code
+def run_workflow(config):
+    errors = []
+    successes = []
+
+    try:
+        # Step 1: Check for new files
+        new_files = git.check_for_new_files(...)
+        if not new_files:
+            logger.info("No new files to process")
+            return {"status": "success", "processed": 0}
+
+        # Step 2: Download files
+        downloaded = git.download_files(new_files, ...)
+
+        # Step 3: Flatten each file
+        for file in downloaded:
+            try:
+                result = flattener.flatten(file, ...)
+                successes.append(result)
+            except Exception as e:
+                errors.append({"file": file, "error": str(e)})
+                if not config.continue_on_error:
+                    raise
+
+        # Step 4: Upload flats
+        if successes:
+            commit_sha = git.upload_directory(flats_dir, ...)
+            logger.info(f"Uploaded flats: {commit_sha}")
+
+        # Report results
+        return {
+            "status": "success" if not errors else "partial",
+            "processed": len(successes),
+            "errors": errors
+        }
+
+    except Exception as e:
+        logger.error(f"Workflow failed: {e}")
+        return {"status": "failed", "error": str(e)}
+```
+
+---
+
+## 9. Testing Strategy
+
+### 9.1 Unit Tests
+
+**Per Component:**
+- Flattener: Test each extraction module independently
+- Converter: Test format conversion
+- Differ: Test diff algorithms
+- Git: Test git operations (mocked)
+- Orchestrator: Test workflow logic (mocked components)
+
+**Coverage Target:** 80%+
+
+---
+
+### 9.2 Integration Tests
+
+**Cross-Component:**
+- Flattener + Converter: Test XLSB extraction
+- Flattener + Differ: Full compare workflow
+- Git + Orchestrator: Test repository operations
+- Full workflow: End-to-end orchestration
+
+---
+
+### 9.3 System Tests
+
+**Complete Workflow:**
+- Set up test repositories
+- Add Excel files
+- Run orchestrator
+- Verify flats uploaded correctly
+- Check git history
+
+---
+
+## 10. Implementation Priorities
+
+### 10.1 Phase 1: Standalone Flattener (CURRENT)
 
 **Goal:** Production-ready, standalone flattener component.
 
 **Scope:**
 - Core extraction (metadata, sheets, formulas, values, formats)
-- VBA extraction (with password protection handling)
-- Normalization for deterministic output
+- VBA extraction
+- Minimal normalisation
 - Manifest generation
 - CLI interface
 - Comprehensive tests
 - Complete documentation
 
-**Out of Scope (for now):**
-- Tables, charts, pivots (placeholders only)
-- Styles and themes (placeholders only)
-- Calculation chain, external links, connections (placeholders only)
-- API server
-- Git integration
-- Differ component
-
 **Timeline:** 2-4 weeks
 
 **Success Criteria:**
 - Can flatten .xlsx and .xlsm files reliably
-- Output is deterministic (same input → same output)
-- Diffs are clean (small changes → small diffs)
+- Output is deterministic
+- Diffs are clean
 - Handles errors gracefully
 - Well-tested (80%+ coverage)
-- Documented (specs, API docs, CLI help)
+- Documented
 
 ---
 
-### 8.2 Future Phases (After User Feedback)
+### 10.2 Phase 2: Converter Component
 
-**Phase 2:** Converter Component
-- Separate XLSB/XLS conversion logic
-- Explore alternatives to LibreOffice
+**Goal:** Separate XLSB/XLS conversion logic.
 
-**Phase 3:** Differ Component
-- Compare flattened snapshots
-- Generate structured diff output
+**Scope:**
+- Extract conversion from flattener
+- Support multiple conversion tools (LibreOffice, etc.)
+- Handle timeouts and errors
+- Caching (optional)
 
-**Phase 4:** Git Handler Component
-- Integrate with git repositories
-- Handle automatic commits
-
-**Phase 5:** API Server
-- HTTP REST API
-- Job queue for async processing
+**Timeline:** 1 week
 
 ---
 
-## 9. Decision Log
+### 10.3 Phase 3: Git Component
 
-### Decision 1: Modular Architecture
+**Goal:** Git operations for download/upload.
+
+**Scope:**
+- Check for new files
+- Download files from repository
+- Upload flats to repository
+- Handle authentication
+- Branch management
+- Conflict resolution
+
+**Timeline:** 1-2 weeks
+
+---
+
+### 10.4 Phase 4: Orchestrator
+
+**Goal:** Workflow coordination.
+
+**Scope:**
+- Workflow engine
+- Configuration management
+- Error handling and retries
+- Progress reporting
+- CLI interface
+
+**Timeline:** 1-2 weeks
+
+---
+
+### 10.5 Phase 5: Differ Component
+
+**Goal:** Compare flattened outputs.
+
+**Scope:**
+- Load and compare flats
+- Generate structured diff
+- Summary statistics
+
+**Timeline:** 1 week
+
+---
+
+## 11. Decision Log
+
+### Decision 1: Orchestrator-Based Architecture
 
 **Date:** 2025-10-29
 
-**Context:** User wants to package flattener, converter, git handler separately.
+**Context:** User wants a main component that coordinates Git operations and flattening.
 
-**Decision:** Adopt modular architecture with independent components.
+**Decision:** Adopt orchestrator pattern with Git, Flattener, and Converter as independent components.
 
 **Rationale:**
-- Easier to develop and test
-- Users can choose which components to use
-- Clear separation of concerns
-- Enables flexible deployment models
+- Clear workflow coordination
+- Components remain independent and testable
+- Easy to extend workflow with new steps
+- Follows "orchestration over choreography" pattern
 
 ---
 
-### Decision 2: Flattener as Primary Focus
+### Decision 2: Git Component for Download/Upload
 
 **Date:** 2025-10-29
 
-**Context:** User encountered issues with current implementation and wants to start fresh.
+**Context:** Need to check for new files, download them, and upload flats.
 
-**Decision:** Focus entirely on flattener component first, defer other components.
+**Decision:** Create dedicated Git component responsible for all repository operations.
 
 **Rationale:**
-- Flattener is the foundation for all other components
-- User needs reliable flattening now
-- Other components depend on stable flattener
-- Allows thorough testing and refinement
+- Separates git concerns from flattening
+- Can be reused across workflows
+- Easier to test git logic independently
+- Handles authentication in one place
 
 ---
 
-### Decision 3: Specifications Before Implementation
+### Decision 3: Minimal Normalisation
 
 **Date:** 2025-10-29
 
-**Context:** Previous implementation had unclear requirements.
+**Context:** User wants to see all changes reflected in diffs, including case and formatting.
 
-**Decision:** Write exhaustive specifications before coding.
+**Decision:** Extract data as-is from Excel, only normalise for consistency (encoding, line endings, sorting).
 
 **Rationale:**
-- Prevents scope creep
-- Ensures completeness
-- Enables parallel work (specs → tests → implementation)
-- Documents decisions for future maintainers
+- All changes visible in diffs
+- No hidden modifications
+- More transparent
+- Easier to debug
 
 ---
 
-### Decision 4: Archive Current Implementation
+### Decision 4: British English in Documentation
 
 **Date:** 2025-10-29
 
-**Context:** User wants to start fresh but not lose existing work.
+**Context:** User preference for British English.
 
-**Decision:** Archive current code in a branch, reference during rewrite.
+**Decision:** Use British English throughout documentation and user-facing text.
 
 **Rationale:**
-- Current code has working normalization logic
-- VBA extraction works
-- Can cherry-pick good parts
-- Preserves git history
+- User preference
+- Code attributes may use American English (following conventions)
+- Documentation should match user's language
 
 ---
 
-## 10. Next Steps
+## 12. Open Questions
 
-1. **Review these specifications with user**
+### For User to Decide:
+
+1. **Git Repository Organisation:**
+   - Use same repo for source and flats, just different branches?
+   - Or completely separate repositories?
+   - How to organise flats directory structure?
+
+2. **File Patterns:**
+   - What patterns to match for Excel files? (e.g., `**/*.xlsx`, `finance/**/*.xlsm`)
+   - Exclude any patterns? (e.g., temp files, ~$*.xlsx)
+
+3. **Processing Behaviour:**
+   - Should orchestrator process all changed files or only new files?
+   - How to handle deleted files (should we delete flats too)?
+   - Continue processing if one file fails, or stop immediately?
+
+4. **Scheduling:**
+   - Run orchestrator manually, on git hook, via cron, or CI/CD?
+   - How often to check for new files?
+
+5. **Converter Implementation:**
+   - Stick with LibreOffice or explore alternatives?
+   - Is XLSB support critical?
+
+---
+
+## 13. Next Steps
+
+1. **Complete Flattener Implementation** (Phase 1)
+   - Implement core extraction
+   - Write comprehensive tests
+   - Document CLI usage
+
+2. **Define Git Component Specs** (Phase 3)
+   - Detailed specification document
+   - API design
+   - Authentication strategy
+
+3. **Define Orchestrator Specs** (Phase 4)
+   - Workflow definition
+   - Configuration format
+   - Error handling rules
+
+4. **User Review and Feedback**
    - Answer open questions
    - Clarify requirements
-   - Prioritize features
+   - Adjust priorities
 
-2. **Create folder structure**
-   - Set up `components/flattener/` directory
-   - Initialize Python package structure
-   - Set up testing framework
+---
 
-3. **Begin implementation**
-   - Start with core flattener
-   - Write tests alongside code
-   - Iterate based on feedback
+## Appendix A: Glossary
 
-4. **Archive old code**
-   - Create `archive/v1` branch
-   - Clean up main branch
-   - Keep only new implementation
+- **Flattener:** Component that converts Excel to text
+- **Flat:** Flattened representation of workbook at a point in time
+- **Manifest:** JSON file listing all extracted files and metadata
+- **Normalisation:** Process of making output deterministic (minimal)
+- **Computed Values:** Displayed cell values (formula results)
+- **Literal Values:** Non-formula cell values
+- **Origin:** Source repository and commit information
+- **Converter:** Tool to convert legacy Excel formats
+- **Orchestrator:** Main coordination component for workflow
+- **Git Component:** Handles repository download/upload operations
+
+---
+
+## Appendix B: References
+
+- [FLATTENER_SPECS.md](FLATTENER_SPECS.md) - Complete flattener specifications
+- [Differ Requirements.md](Differ%20Requirements.md) - Original system requirements (historical)
 
 ---
 
