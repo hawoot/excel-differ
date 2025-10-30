@@ -240,14 +240,15 @@ def write_charts_file(charts: List[Dict[str, Any]], output_path: Path) -> None:
         charts: List of chart dictionaries
         output_path: Path to output file
     """
-    if not charts:
-        return
-
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write('# Charts\n')
-        f.write('# ======\n\n')
+        f.write('# ' + '=' * 50 + '\n\n')
+
+        if not charts:
+            f.write('(No charts found)\n')
+            return
 
         for chart in charts:
             f.write(f"Chart {chart['index']}:\n")

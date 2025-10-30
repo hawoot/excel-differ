@@ -20,7 +20,7 @@ from .utils import (
 )
 from .manifest import Manifest
 from .metadata import extract_metadata, write_metadata_file
-from .structure import extract_structure, write_structure_file
+from .workbook_structure import extract_structure, write_structure_file
 from .sheets import SheetExtractor, write_formulas_file, write_values_file, write_formats_file
 from .vba import extract_vba, write_vba_files, write_vba_summary
 from .tables import extract_tables, write_tables_file, extract_autofilters, write_autofilters_file
@@ -251,7 +251,7 @@ class Flattener:
                     visible=sheet_info['visible']
                 )
 
-            structure_path = flat_root / 'structure.txt'
+            structure_path = flat_root / 'workbook-structure.txt'
             write_structure_file(structure, structure_path)
             manifest.add_file(structure_path, flat_root)
 
@@ -279,34 +279,30 @@ class Flattener:
                 sheet_dir = sheets_dir / safe_name
                 sheet_dir.mkdir(exist_ok=True)
 
-                # Extract formulas
+                # Extract formulas - ALWAYS create file
                 formulas = extractor.extract_formulas()
-                if formulas:
-                    formulas_path = sheet_dir / 'formulas.txt'
-                    write_formulas_file(sheet_name, formulas, formulas_path)
-                    manifest.add_file(formulas_path, flat_root)
+                formulas_path = sheet_dir / 'formulas.txt'
+                write_formulas_file(sheet_name, formulas, formulas_path)
+                manifest.add_file(formulas_path, flat_root)
 
-                # Extract literal values
+                # Extract literal values - ALWAYS create file
                 literal_values = extractor.extract_literal_values()
-                if literal_values:
-                    literal_path = sheet_dir / 'literal-values.txt'
-                    write_values_file(sheet_name, literal_values, literal_path, file_type='literal')
-                    manifest.add_file(literal_path, flat_root)
+                literal_path = sheet_dir / 'literal-values.txt'
+                write_values_file(sheet_name, literal_values, literal_path, file_type='literal')
+                manifest.add_file(literal_path, flat_root)
 
-                # Extract computed values (if enabled)
+                # Extract computed values - ALWAYS create file if enabled
                 if self.include_computed:
                     computed_values = extractor.extract_computed_values()
-                    if computed_values:
-                        computed_path = sheet_dir / 'computed-values.txt'
-                        write_values_file(sheet_name, computed_values, computed_path, file_type='computed')
-                        manifest.add_file(computed_path, flat_root)
+                    computed_path = sheet_dir / 'computed-values.txt'
+                    write_values_file(sheet_name, computed_values, computed_path, file_type='computed')
+                    manifest.add_file(computed_path, flat_root)
 
-                # Extract formats
+                # Extract formats - ALWAYS create file
                 formats = extractor.extract_formats()
-                if formats:
-                    formats_path = sheet_dir / 'formats.txt'
-                    write_formats_file(sheet_name, formats, formats_path)
-                    manifest.add_file(formats_path, flat_root)
+                formats_path = sheet_dir / 'formats.txt'
+                write_formats_file(sheet_name, formats, formats_path)
+                manifest.add_file(formats_path, flat_root)
 
             except Exception as e:
                 logger.error(f"Error extracting sheet {sheet_name}: {e}", exc_info=True)
@@ -340,19 +336,17 @@ class Flattener:
         """Extract tables and autofilters."""
         logger.info("Extracting tables...")
         try:
-            # Tables
+            # Tables - ALWAYS create file
             tables = extract_tables(wb)
-            if tables:
-                tables_path = flat_root / 'tables.txt'
-                write_tables_file(tables, tables_path)
-                manifest.add_file(tables_path, flat_root)
+            tables_path = flat_root / 'tables.txt'
+            write_tables_file(tables, tables_path)
+            manifest.add_file(tables_path, flat_root)
 
-            # Autofilters
+            # Autofilters - ALWAYS create file
             autofilters = extract_autofilters(wb)
-            if autofilters:
-                autofilters_path = flat_root / 'autofilters.txt'
-                write_autofilters_file(autofilters, autofilters_path)
-                manifest.add_file(autofilters_path, flat_root)
+            autofilters_path = flat_root / 'autofilters.txt'
+            write_autofilters_file(autofilters, autofilters_path)
+            manifest.add_file(autofilters_path, flat_root)
 
         except Exception as e:
             logger.error(f"Error extracting tables: {e}", exc_info=True)
@@ -362,11 +356,11 @@ class Flattener:
         """Extract charts."""
         logger.info("Extracting charts...")
         try:
+            # Charts - ALWAYS create file
             charts = extract_charts(wb)
-            if charts:
-                charts_path = flat_root / 'charts.txt'
-                write_charts_file(charts, charts_path)
-                manifest.add_file(charts_path, flat_root)
+            charts_path = flat_root / 'charts.txt'
+            write_charts_file(charts, charts_path)
+            manifest.add_file(charts_path, flat_root)
 
         except Exception as e:
             logger.error(f"Error extracting charts: {e}", exc_info=True)
@@ -376,11 +370,11 @@ class Flattener:
         """Extract named ranges."""
         logger.info("Extracting named ranges...")
         try:
+            # Named ranges - ALWAYS create file
             named_ranges = extract_named_ranges(wb)
-            if named_ranges:
-                named_ranges_path = flat_root / 'named-ranges.txt'
-                write_named_ranges_file(named_ranges, named_ranges_path)
-                manifest.add_file(named_ranges_path, flat_root)
+            named_ranges_path = flat_root / 'named-ranges.txt'
+            write_named_ranges_file(named_ranges, named_ranges_path)
+            manifest.add_file(named_ranges_path, flat_root)
 
         except Exception as e:
             logger.error(f"Error extracting named ranges: {e}", exc_info=True)

@@ -114,14 +114,15 @@ def write_tables_file(tables: List[Dict[str, Any]], output_path: Path) -> None:
         tables: List of table dictionaries
         output_path: Path to output file
     """
-    if not tables:
-        return
-
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write('# Excel Tables\n')
-        f.write('# =============\n\n')
+        f.write('# ' + '=' * 50 + '\n\n')
+
+        if not tables:
+            f.write('(No tables found)\n')
+            return
 
         for table in tables:
             f.write(f"Table: {table['name']}\n")
@@ -193,14 +194,15 @@ def write_autofilters_file(autofilters: List[Dict[str, Any]], output_path: Path)
         autofilters: List of autofilter dictionaries
         output_path: Path to output file
     """
-    if not autofilters:
-        return
-
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write('# AutoFilters\n')
-        f.write('# ============\n\n')
+        f.write('# ' + '=' * 50 + '\n\n')
+
+        if not autofilters:
+            f.write('(No autofilters found)\n')
+            return
 
         for filter_info in autofilters:
             f.write(f"Sheet: {filter_info['sheet']}\n")

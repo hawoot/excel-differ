@@ -68,7 +68,7 @@ def write_structure_file(structure: List[Dict[str, Any]], output_path: Path) -> 
 
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write('# Workbook Structure\n')
-        f.write('# ==================\n\n')
+        f.write('# ' + '=' * 50 + '\n\n')
 
         for sheet in structure:
             f.write(f"Sheet: {sheet['name']}\n")

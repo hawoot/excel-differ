@@ -39,7 +39,7 @@ source "$VENV_DIR/bin/activate"
 if ! pip show openpyxl &>/dev/null; then
     echo -e "${YELLOW}[*] Installing dependencies...${NC}"
 
-    if ! pip install -r requirements.txt; then
+    if ! pip install -r "$SCRIPT_DIR/requirements.txt"; then
         echo -e "${RED}[X] Failed to install dependencies${NC}"
         exit 1
     fi

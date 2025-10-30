@@ -2,189 +2,82 @@
 
 Convert Excel workbooks to deterministic, diff-friendly text representations.
 
+## What It Does
+
+Excel Flattener extracts everything from an Excel file into organised text files:
+
+- **Formulas & Values**: Cell formulas and their literal values
+- **VBA Macros**: Complete VBA code (even from password-protected projects)
+- **Charts & Tables**: Chart definitions and Excel tables
+- **Structure**: Sheet order, visibility, named ranges
+- **Metadata**: Author, creation dates, workbook properties
+- **Formats**: Cell formatting (fonts, colours, borders, alignment)
+
+**Why?** Because Excel files are binary blobs that don't diff well. This tool produces deterministic, version-control-friendly text that lets you see exactly what changed.
+
 ## Features
 
-- **Complete Extraction**: Formulas, values, VBA macros, charts, tables, named ranges, formats
-- **Minimal Normalisation**: Extract data as-is from Excel with only essential normalisation
 - **Deterministic Output**: Same input always produces identical output (byte-for-byte)
-- **VBA Support**: Extract VBA code, including from password-protected projects
+- **Minimal Normalisation**: Extract data as-is from Excel with only essential normalisation
 - **Multiple Formats**: Supports .xlsx, .xlsm, .xlsb, .xls
 - **Configurable**: Environment-based configuration with sensible defaults
-- **Standalone**: Single-file executable available (PyInstaller)
-- **Well-Logged**: Colored console output with detailed file logging
+- **Standalone**: Can build single-file executable (no Python required)
+- **Well-Logged**: Coloured console output with detailed file logging
+
+---
 
 ## Quick Start
 
-### Using Python
+### Option 1: Run from Source (Development)
 
 ```bash
-# Setup
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-
-# Flatten a workbook
-python -m src flatten workbook.xlsx
-```
-
-### Using Launcher Scripts
-
-```bash
-# Linux/Mac
+# Linux/Mac - launcher handles everything (venv, deps, run)
 ./scripts/run_flattener.sh flatten workbook.xlsx
 
 # Windows
 scripts\run_flattener.bat flatten workbook.xlsx
 ```
 
-The launcher scripts automatically set up the virtual environment and install dependencies.
+The launcher scripts automatically set up a virtual environment and install dependencies.
 
-### Using Standalone Executable
+### Option 2: Run with Python
 
 ```bash
-# Build executable
-./scripts/build_package.sh  # On Windows: scripts\build_package.bat
+# Setup once
+python3 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r scripts/requirements.txt
 
-# Use executable
+# Flatten a workbook
+python -m src flatten workbook.xlsx
+```
+
+### Option 3: Standalone Executable (Distribution)
+
+```bash
+# Build executable (creates dist/excel-flattener)
+./scripts/build_package.sh  # Windows: scripts\build_package.bat
+
+# Use executable (no Python required)
 ./dist/excel-flattener flatten workbook.xlsx
 ```
 
-## Installation
-
-### Requirements
-
-- Python 3.9 or higher
-- pip (Python package manager)
-
-### Dependencies
-
-All dependencies are listed in [requirements.txt](requirements.txt):
-
-- **openpyxl** (≥3.1.0): Excel file parsing
-- **lxml** (≥4.9.0): XML processing
-- **oletools** (≥0.60): VBA extraction
-- **click** (≥8.1.0): CLI framework
-- **python-dotenv** (≥1.0.0): Environment configuration
-
-## Configuration
-
-Configuration is managed through environment variables or a `.env` file.
-
-### Environment Variables
-
-All variables have the `FLATTENER_` prefix:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `FLATTENER_OUTPUT_DIR` | `./flats` | Where to create flat outputs |
-| `FLATTENER_LOG_DIR` | *(system temp)* | Where to write log files |
-| `FLATTENER_LOG_LEVEL` | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR) |
-| `FLATTENER_INCLUDE_COMPUTED` | `false` | Extract computed values? |
-| `FLATTENER_EXTRACTION_TIMEOUT` | `900` | Maximum extraction time (seconds) |
-| `FLATTENER_MAX_FILE_SIZE_MB` | `200` | Maximum file size (MB) |
-| `FLATTENER_TEMP_DIR` | *(system temp)* | Temporary file location |
-
-### Creating a .env File
-
-Copy the example and customise:
-
-```bash
-cp .env.example .env
-# Edit .env with your preferences
-```
-
-Example `.env`:
-
-```bash
-FLATTENER_OUTPUT_DIR=./my-flats
-FLATTENER_LOG_LEVEL=DEBUG
-FLATTENER_INCLUDE_COMPUTED=true
-FLATTENER_EXTRACTION_TIMEOUT=1200
-```
-
-## Usage
-
-### Command-Line Interface
-
-#### Flatten a Workbook
-
-```bash
-# Basic usage
-python -m src flatten workbook.xlsx
-
-# With options
-python -m src flatten workbook.xlsx --include-computed --log-level DEBUG
-
-# Custom output directory
-python -m src flatten workbook.xlsx -o ./output
-
-# With git origin metadata
-python -m src flatten workbook.xlsx \
-  --origin-repo https://github.com/user/repo \
-  --origin-commit abc123 \
-  --origin-path data/workbook.xlsx
-```
-
-#### View Configuration
-
-```bash
-python -m src config
-```
-
-#### File Information
-
-```bash
-python -m src info workbook.xlsx
-```
-
-#### Help
-
-```bash
-python -m src --help
-python -m src flatten --help
-```
-
-### Programmatic Usage
-
-```python
-from pathlib import Path
-from src import Flattener, setup_logging
-
-# Setup logging
-setup_logging(log_level='INFO', log_dir=None, component='flattener')
-
-# Create flattener
-flattener = Flattener(
-    output_dir=Path('./flats'),
-    include_computed=False,
-    timeout=900,
-    max_file_size_mb=200
-)
-
-# Flatten workbook
-flat_root = flattener.flatten(
-    excel_file=Path('workbook.xlsx'),
-    origin_repo='https://github.com/user/repo',
-    origin_commit='abc123'
-)
-
-print(f"Flattened to: {flat_root}")
-```
+---
 
 ## Output Structure
 
-The flattener creates a timestamped directory with the following structure:
+The flattener creates a timestamped directory:
 
 ```
-workbook-flat-2025-10-30T14-30-22Z-a1b2c3d4/
-├── manifest.json              # Extraction metadata and file inventory
-├── metadata.txt               # Workbook properties (author, dates, etc.)
-├── structure.txt              # Sheet order, visibility, tab colours
-├── named-ranges.txt           # Named ranges and constants
-├── tables.txt                 # Excel tables (ListObjects)
+./tmp/flats/workbook-flat-20251030T143022Z-a3f5c8d1/
+├── manifest.json              # Extraction metadata & file inventory
+├── metadata.txt               # Workbook properties (author, dates)
+├── workbook-structure.txt     # Sheet order, visibility, tab colours
+├── named-ranges.txt           # Named ranges
+├── tables.txt                 # Excel tables
 ├── autofilters.txt            # AutoFilter definitions
-├── charts.txt                 # Chart definitions and series
-├── vba/                       # VBA macros (if present)
+├── charts.txt                 # Chart definitions
+├── vba/                       # VBA modules (if present)
 │   ├── vba-summary.txt
 │   ├── Module1.vba
 │   └── ThisWorkbook.vba
@@ -198,104 +91,145 @@ workbook-flat-2025-10-30T14-30-22Z-a1b2c3d4/
         └── ...
 ```
 
-### Output Files
+**All files are always created** - even if empty (with headers + "(No X found)"), ensuring consistent structure for scripting and diffing.
 
-#### manifest.json
+---
 
-JSON file tracking:
-- Original file hash (SHA256)
-- Extraction timestamp
-- Extractor version
-- All sheets with indices and visibility
-- All generated files with hashes
-- Warnings encountered
-- Git origin metadata (if provided)
+## Usage Examples
 
-#### metadata.txt
+### Basic Usage
 
-Workbook properties:
-- Author
-- Created/Modified dates
-- Title, Subject, Description
-- Company, Version
-- Calculation mode
-- Excel version
+```bash
+# Flatten a workbook
+python -m src flatten workbook.xlsx
 
-#### structure.txt
+# Include computed values (formula results)
+python -m src flatten workbook.xlsx --include-computed
 
-Sheet information:
-- Index (1-based position)
-- Name
-- Visibility (visible/hidden/veryHidden)
-- Tab colour
-- Row/column counts
+# Custom output directory
+python -m src flatten workbook.xlsx -o ./my-output
 
-#### formulas.txt
-
-Cell formulas in row-major order:
-
-```
-A1: =SUM(B1:B10)
-A2: =AVERAGE(C1:C10)
-B5: =IF(A5>10, "High", "Low")
+# Debug logging
+python -m src flatten workbook.xlsx --log-level DEBUG
 ```
 
-#### literal-values.txt
+### With Git Metadata
 
-Hardcoded cell values:
-
-```
-A1: 42 (number)
-A2: Hello World (text)
-A3: 2025-10-30T00:00:00Z (date)
-A4: TRUE (boolean)
-```
-
-#### computed-values.txt
-
-Formula results (only if `FLATTENER_INCLUDE_COMPUTED=true`):
-
-```
-A1: 450 (number)
-A2: 45.5 (number)
-B5: High (text)
+```bash
+python -m src flatten workbook.xlsx \
+  --origin-repo https://github.com/user/repo \
+  --origin-commit abc123 \
+  --origin-path data/workbook.xlsx \
+  --origin-commit-message "Updated sales data"
 ```
 
-#### formats.txt
+This metadata gets recorded in `manifest.json` for traceability.
 
-Cell formatting (fonts, fills, borders, alignment):
+### View File Information
 
-```
-A1:
-  number_format: 0.00
-  font:
-    name: Arial
-    size: 12
-    bold: true
-    colour: FF0000
-  fill:
-    type: solid
-    colour: FFFF00
+```bash
+# Show file size, hash, validation status
+python -m src info workbook.xlsx
 ```
 
-## Normalisation Philosophy
+### Show Current Configuration
 
-The flattener extracts data **as-is** from Excel with minimal normalisation:
+```bash
+# Display all environment variables and their values
+python -m src config
+```
 
-### What is NOT normalised
+### Get Help
 
-- **Formulas**: Preserved exactly as stored (case, spacing, structure)
-- **Numbers**: Full precision, no rounding or truncation
-- **Text**: Preserved verbatim
-- **Case**: No case changes to formulas or cell references
+```bash
+python -m src --help
+python -m src flatten --help
+```
 
-### What IS normalised
+---
 
-- **Text Encoding**: UTF-8
-- **Line Endings**: LF (`\n`)
-- **Cell Order**: Row-major sorting (A1, A2, B1, B2, ...)
+## Configuration
 
-This ensures meaningful diffs while maintaining data fidelity.
+Configuration is managed through environment variables or a `.env` file.
+
+### Quick Setup
+
+```bash
+# Copy template
+cp .env.example .env
+
+# Edit with your preferences
+nano .env
+```
+
+### Environment Variables
+
+All variables have the `FLATTENER_` prefix:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `FLATTENER_OUTPUT_DIR` | `./tmp/flats` | Where to create flat outputs |
+| `FLATTENER_LOG_DIR` | `./tmp/logs` | Where to write log files |
+| `FLATTENER_LOG_LEVEL` | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR) |
+| `FLATTENER_INCLUDE_COMPUTED` | `false` | Extract computed values (formula results)? |
+| `FLATTENER_EXTRACTION_TIMEOUT` | `900` | Maximum extraction time (seconds) |
+| `FLATTENER_MAX_FILE_SIZE_MB` | `200` | Maximum file size (MB) |
+| `FLATTENER_TEMP_DIR` | `./tmp/temp` | Temporary file location |
+
+### Example `.env`
+
+```bash
+FLATTENER_OUTPUT_DIR=./tmp/flats
+FLATTENER_LOG_LEVEL=DEBUG
+FLATTENER_INCLUDE_COMPUTED=true
+FLATTENER_EXTRACTION_TIMEOUT=1200
+```
+
+### CLI Overrides
+
+Command-line options override environment variables:
+
+```bash
+# Override output directory and log level
+python -m src flatten workbook.xlsx -o ./output --log-level DEBUG
+
+# Override timeout and max size
+python -m src flatten workbook.xlsx --timeout 1800 --max-size 500
+```
+
+---
+
+## Distribution
+
+### Option 1: Source Distribution
+
+Share the entire `flattener/` folder:
+
+```bash
+# Users run
+./scripts/run_flattener.sh flatten workbook.xlsx
+```
+
+**Requirements**: Python 3.9+
+
+### Option 2: Binary Distribution (Recommended)
+
+Share just the `dist/` folder after building:
+
+```bash
+# Build
+./scripts/build_package.sh
+
+# Distribute dist/excel-flattener
+# Users can run without Python installed
+./excel-flattener flatten workbook.xlsx
+```
+
+**Requirements**: None (standalone executable)
+
+**Note**: The `.env` file is NOT bundled. Users must create their own `.env` file in the same directory as the executable, or set environment variables.
+
+---
 
 ## Supported Excel Features
 
@@ -325,153 +259,50 @@ This ensures meaningful diffs while maintaining data fidelity.
 - ✗ Slicers
 - ✗ Pivot tables
 
-## Building Standalone Executable
+---
 
-### Linux/Mac
+## Normalisation Philosophy
 
-```bash
-./build_package.sh
-```
+The flattener extracts data **as-is** from Excel with minimal normalisation:
 
-### Windows
+### What is NOT normalised
 
-```cmd
-build_package.bat
-```
+- **Formulas**: Preserved exactly as stored (case, spacing, structure)
+- **Numbers**: Full precision, no rounding or truncation
+- **Text**: Preserved verbatim
+- **Case**: No case changes to formulas or cell references
 
-The build creates a single-file executable in the `dist/` directory:
+### What IS normalised
 
-- **Portable**: No Python installation required
-- **Self-contained**: All dependencies bundled
-- **Slower startup**: Extracts to temp on first run (~2-3 seconds)
+- **Text Encoding**: UTF-8
+- **Line Endings**: LF (`\n`)
+- **Cell Order**: Row-major sorting (A1, A2, B1, B2, ...)
 
-### Distribution
+This ensures meaningful diffs while maintaining data fidelity.
 
-The executable can be distributed as-is:
+---
 
-```bash
-# Copy to destination
-cp dist/excel-flattener /usr/local/bin/
+## Troubleshooting
 
-# Use anywhere
-excel-flattener flatten workbook.xlsx
-```
-
-**Note**: The `.env` file is NOT bundled. Users must create their own `.env` file in the same directory as the executable, or set environment variables.
-
-## Logging
-
-### Console Output
-
-Colored, user-friendly logs:
-
-- 🟢 **INFO**: Progress updates
-- 🟡 **WARNING**: Non-fatal issues
-- 🔴 **ERROR**: Failures
-
-Example:
-
-```
-[2025-10-30 14:30:22] INFO | flattener | ======================================================================
-[2025-10-30 14:30:22] INFO | flattener | Starting extraction: workbook.xlsx
-[2025-10-30 14:30:22] INFO | flattener | ======================================================================
-[2025-10-30 14:30:23] INFO | flattener | ✓ File validated (15.3MB)
-[2025-10-30 14:30:25] INFO | flattener | ✓ Workbook loaded (5 sheets)
-```
-
-### File Logging
-
-Plain text logs written to `FLATTENER_LOG_DIR` (or system temp):
-
-- Always at DEBUG level (regardless of console level)
-- Timestamped filenames: `flattener-2025-10-30T14-30-22.log`
-- Full stack traces for errors
-- Rotated automatically (not implemented - future enhancement)
-
-## Error Handling
-
-### Exit Codes
-
-- `0`: Success
-- `1`: Validation error (invalid file, too large, wrong format)
-- `2`: Timeout (extraction exceeded `FLATTENER_EXTRACTION_TIMEOUT`)
-- `3`: Extraction error (unexpected failure)
-
-### Common Issues
-
-#### "File too large"
+### "File too large"
 
 Increase `FLATTENER_MAX_FILE_SIZE_MB`:
 
 ```bash
 export FLATTENER_MAX_FILE_SIZE_MB=500
+python -m src flatten large-workbook.xlsx
 ```
 
-#### "Extraction exceeded timeout"
+### "Extraction exceeded timeout"
 
 Increase `FLATTENER_EXTRACTION_TIMEOUT`:
 
 ```bash
 export FLATTENER_EXTRACTION_TIMEOUT=1800  # 30 minutes
+python -m src flatten complex-workbook.xlsx
 ```
-
-#### "oletools not available"
-
-VBA extraction requires oletools:
-
-```bash
-pip install oletools
-```
-
-## Development
-
-### Project Structure
-
-```
-flattener/
-├── src/                       # Core library
-│   ├── __init__.py           # Package exports
-│   ├── __main__.py           # CLI interface (Click)
-│   ├── flattener.py          # Main Flattener class
-│   ├── utils.py              # Logging, hashing, config
-│   ├── manifest.py           # Manifest generation
-│   ├── normalizer.py         # Normalisation utilities
-│   ├── metadata.py           # Workbook metadata
-│   ├── structure.py          # Sheet structure
-│   ├── sheets.py             # Sheet data extraction
-│   ├── vba.py                # VBA extraction
-│   ├── tables.py             # Tables and autofilters
-│   ├── charts.py             # Chart extraction
-│   └── named_ranges.py       # Named ranges
-├── scripts/                   # Scripts
-│   ├── run_flattener.sh      # Launcher (Linux/Mac)
-│   ├── run_flattener.bat     # Launcher (Windows)
-│   ├── build_package.sh      # Build script (Linux/Mac)
-│   ├── build_package.bat     # Build script (Windows)
-│   └── create_sample.py      # Sample file generator
-├── requirements.txt           # Python dependencies
-├── .env.example              # Configuration template
-├── test_flattener.ipynb      # Jupyter notebook
-├── README.md                 # Documentation
-└── IMPLEMENTATION_STATUS.md  # Implementation status
-```
-
-### Running Tests
-
-Tests to be implemented in future version.
-
-### Code Style
-
-- **Language**: British English in all documentation and user-facing text
-- **Docstrings**: Google-style
-- **Formatting**: Follow PEP 8
-- **Type Hints**: Used where beneficial
-
-## Troubleshooting
 
 ### Virtual Environment Issues
-
-If you encounter venv issues:
 
 ```bash
 # Remove existing venv
@@ -480,37 +311,121 @@ rm -rf venv
 # Recreate
 python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+pip install -r scripts/requirements.txt
 ```
 
-### PyInstaller Issues
-
-If build fails:
+### Build Issues
 
 ```bash
 # Clear PyInstaller cache
 rm -rf build dist *.spec
 
-# Rebuild with verbose output
-pyinstaller --onefile --name excel-flattener --log-level DEBUG cli.py
+# Rebuild
+./scripts/build_package.sh
 ```
 
-### Permission Errors
-
-On Linux/Mac, ensure scripts are executable:
+### Permission Errors (Linux/Mac)
 
 ```bash
+# Make scripts executable
 chmod +x scripts/run_flattener.sh scripts/build_package.sh
 ```
+
+---
+
+## Requirements
+
+### For Running from Source
+
+- Python 3.9 or higher
+- pip (Python package manager)
+
+### For Building Executable
+
+- Python 3.9 or higher
+- PyInstaller (installed by build scripts)
+
+### Dependencies
+
+All dependencies are in [scripts/requirements.txt](scripts/requirements.txt):
+
+- **openpyxl** (≥3.1.0): Excel file parsing
+- **lxml** (≥4.9.0): XML processing
+- **oletools** (≥0.60): VBA extraction
+- **click** (≥8.1.0): CLI framework
+- **python-dotenv** (≥1.0.0): Environment configuration
+
+---
+
+## Folder Structure
+
+```
+flattener/
+├── README.md              # This file (user guide)
+├── .env.example           # Configuration template
+├── src/                   # Production code (13 modules)
+│   ├── __main__.py       # CLI entry point
+│   ├── flattener.py      # Main orchestrator
+│   └── ...               # Extraction modules
+├── scripts/               # Build & development tools
+│   ├── requirements.txt  # Python dependencies
+│   ├── run_flattener.sh  # Development launcher (Linux/Mac)
+│   ├── run_flattener.bat # Development launcher (Windows)
+│   ├── build_package.sh  # Build script (Linux/Mac)
+│   └── build_package.bat # Build script (Windows)
+├── docs/                  # Developer documentation
+│   └── DEVELOPER_GUIDE.md # Internal implementation guide
+└── snippets/              # Development tools & examples
+    ├── sample.xlsx        # Test Excel file
+    ├── create_sample.py   # Sample file generator
+    └── test_flattener.ipynb # Jupyter testing notebook
+```
+
+**For developers**: See [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) for internal documentation.
+
+---
+
+## Logging
+
+### Console Output
+
+Coloured, user-friendly logs:
+
+- 🟢 **INFO**: Progress updates
+- 🟡 **WARNING**: Non-fatal issues
+- 🔴 **ERROR**: Failures
+
+```
+[2025-10-30 14:30:22] INFO | flattener | Starting extraction: workbook.xlsx
+[2025-10-30 14:30:23] INFO | flattener | ✓ File validated (15.3MB)
+[2025-10-30 14:30:25] INFO | flattener | ✓ Workbook loaded (5 sheets)
+```
+
+### File Logging
+
+Plain text logs written to `./tmp/logs/`:
+
+- Always at DEBUG level (regardless of console level)
+- Timestamped filenames: `flattener-20251030T143022.log`
+- Full stack traces for errors
+
+---
+
+## Exit Codes
+
+- `0`: Success
+- `1`: Validation error (invalid file, too large, wrong format)
+- `2`: Timeout (extraction exceeded `FLATTENER_EXTRACTION_TIMEOUT`)
+- `3`: Extraction error (unexpected failure)
+
+---
 
 ## Version
 
 Current version: **2.1.0**
 
-## Licence
-
-To be determined.
+---
 
 ## Support
 
-For issues and feature requests, please contact the development team.
+For developer documentation and internal implementation details, see [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md).

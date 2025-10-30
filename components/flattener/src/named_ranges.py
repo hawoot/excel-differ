@@ -111,14 +111,15 @@ def write_named_ranges_file(named_ranges: List[Dict[str, Any]], output_path: Pat
         named_ranges: List of named range dictionaries
         output_path: Path to output file
     """
-    if not named_ranges:
-        return
-
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write('# Named Ranges\n')
-        f.write('# =============\n\n')
+        f.write('# ' + '=' * 50 + '\n\n')
+
+        if not named_ranges:
+            f.write('(No named ranges found)\n')
+            return
 
         for nr in named_ranges:
             f.write(f"Name: {nr['name']}\n")

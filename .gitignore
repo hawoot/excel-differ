@@ -48,7 +48,8 @@ htmlcov/
 # Jupyter
 .ipynb_checkpoints/
 
-# Output
+# Output & Temporary Files
+# All temporary files go under tmp/ directory
 tmp/
 
 # PyInstaller

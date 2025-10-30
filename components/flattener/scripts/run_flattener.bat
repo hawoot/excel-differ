@@ -32,7 +32,7 @@ REM Check if dependencies are installed
 pip show openpyxl >nul 2>&1
 if errorlevel 1 (
     echo [*] Installing dependencies...
-    pip install -r requirements.txt
+    pip install -r "%SCRIPT_DIR%\requirements.txt"
     if errorlevel 1 (
         echo [X] Failed to install dependencies
         exit /b 1

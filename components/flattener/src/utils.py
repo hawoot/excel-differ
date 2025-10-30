@@ -31,13 +31,13 @@ def load_config():
     load_dotenv()
 
     config = {
-        'output_dir': Path(os.getenv('FLATTENER_OUTPUT_DIR', './flats')),
-        'log_dir': os.getenv('FLATTENER_LOG_DIR', ''),  # Empty = temp
+        'output_dir': Path(os.getenv('FLATTENER_OUTPUT_DIR', './tmp/flats')),
+        'log_dir': os.getenv('FLATTENER_LOG_DIR', './tmp/logs'),
         'log_level': os.getenv('FLATTENER_LOG_LEVEL', 'INFO').upper(),
         'include_computed': os.getenv('FLATTENER_INCLUDE_COMPUTED', 'false').lower() == 'true',
         'extraction_timeout': int(os.getenv('FLATTENER_EXTRACTION_TIMEOUT', '900')),
         'max_file_size_mb': int(os.getenv('FLATTENER_MAX_FILE_SIZE_MB', '200')),
-        'temp_dir': os.getenv('FLATTENER_TEMP_DIR', ''),  # Empty = system temp
+        'temp_dir': os.getenv('FLATTENER_TEMP_DIR', './tmp/temp'),
     }
 
     return config
@@ -72,13 +72,13 @@ class ColourFormatter(logging.Formatter):
         return super().format(record)
 
 
-def setup_logging(log_level: str = 'INFO', log_dir: str = '', component: str = 'flattener'):
+def setup_logging(log_level: str = 'INFO', log_dir: Optional[str] = None, component: str = 'flattener'):
     """
     Set up logging for the flattener.
 
     Args:
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR)
-        log_dir: Directory for log files (empty = system temp)
+        log_dir: Directory for log files (None = use default ./tmp/logs)
         component: Component name for log filename
 
     Returns:
@@ -102,10 +102,10 @@ def setup_logging(log_level: str = 'INFO', log_dir: str = '', component: str = '
     logger.addHandler(console_handler)
 
     # File handler (no colour)
-    if log_dir:
-        log_path = Path(log_dir)
+    if log_dir is None:
+        log_path = Path('./tmp/logs')
     else:
-        log_path = Path(tempfile.gettempdir()) / 'excel-flattener'
+        log_path = Path(log_dir)
 
     log_path.mkdir(parents=True, exist_ok=True)
 

@@ -35,7 +35,7 @@ call "%VENV_DIR%\Scripts\activate.bat"
 
 REM Install dependencies
 echo [*] Installing dependencies...
-pip install -r requirements.txt
+pip install -r "%SCRIPT_DIR%\requirements.txt"
 if errorlevel 1 (
     echo [X] Failed to install dependencies
     exit /b 1
