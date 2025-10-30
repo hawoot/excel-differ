@@ -50,13 +50,16 @@ def _extract_sheet_tables(ws: Worksheet) -> List[Dict[str, Any]]:
     if not hasattr(ws, 'tables') or not ws.tables:
         return tables
 
-    for table_name, table in ws.tables.items():
+    for table_name, table_ref in ws.tables.items():
         try:
+            # Get the actual table object (ws.tables[name] returns the object)
+            table = ws.tables[table_name]
+
             table_info = {
                 'sheet': ws.title,
                 'name': table_name,
                 'display_name': table.displayName if hasattr(table, 'displayName') else table_name,
-                'ref': str(table.ref) if table.ref else '',
+                'ref': str(table_ref) if table_ref else '',  # table_ref is the reference string from .items()
                 'table_style': table.tableStyleInfo.name if hasattr(table, 'tableStyleInfo') and table.tableStyleInfo else None,
                 'show_header_row': True,  # Default
                 'show_totals_row': False,  # Default
@@ -64,11 +67,11 @@ def _extract_sheet_tables(ws: Worksheet) -> List[Dict[str, Any]]:
             }
 
             # Get header row setting
-            if hasattr(table, 'headerRowCount'):
+            if hasattr(table, 'headerRowCount') and table.headerRowCount is not None:
                 table_info['show_header_row'] = table.headerRowCount > 0
 
             # Get totals row setting
-            if hasattr(table, 'totalsRowCount'):
+            if hasattr(table, 'totalsRowCount') and table.totalsRowCount is not None:
                 table_info['show_totals_row'] = table.totalsRowCount > 0
 
             # Extract columns

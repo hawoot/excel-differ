@@ -53,8 +53,11 @@ class SheetExtractor:
         for row in self.ws.iter_rows():
             for cell in row:
                 if cell.data_type == 'f':  # Formula
-                    formula_str = cell.value
-                    if formula_str:
+                    formula_value = cell.value
+                    if formula_value:
+                        # Convert to string (handles ArrayFormula objects, etc.)
+                        formula_str = str(formula_value)
+
                         # Ensure leading =
                         if not formula_str.startswith('='):
                             formula_str = f'={formula_str}'
