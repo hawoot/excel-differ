@@ -28,48 +28,60 @@ def cli():
 @click.option(
     '--output-dir', '-o',
     type=click.Path(path_type=Path),
-    help='Output directory for flat files (default: from config)'
+    help='Output directory for flat files (default: ./tmp/flats)'
 )
 @click.option(
     '--include-computed/--no-computed',
     default=None,
-    help='Include computed values (default: from config)'
+    help='Include computed values / formula results (default: False)'
+)
+@click.option(
+    '--include-literal/--no-literal',
+    default=None,
+    help='Include literal values / hardcoded values (default: True)'
+)
+@click.option(
+    '--include-formats/--no-formats',
+    default=None,
+    help='Include cell formatting (default: True)'
 )
 @click.option(
     '--origin-repo',
-    help='Git repository URL (for manifest)'
+    help='Git repository URL (for traceability in manifest)'
 )
 @click.option(
     '--origin-path',
-    help='Path in repository (for manifest)'
+    help='Path in repository (for traceability in manifest)'
 )
 @click.option(
     '--origin-commit',
-    help='Git commit SHA (for manifest)'
+    help='Git commit SHA (for traceability in manifest)'
 )
 @click.option(
     '--origin-commit-message',
-    help='Git commit message (for manifest)'
+    help='Git commit message (for traceability in manifest)'
 )
 @click.option(
     '--log-level',
     type=click.Choice(['DEBUG', 'INFO', 'WARNING', 'ERROR'], case_sensitive=False),
-    help='Logging level (default: from config)'
+    help='Logging level (default: INFO)'
 )
 @click.option(
     '--timeout',
     type=int,
-    help='Extraction timeout in seconds (default: from config)'
+    help='Extraction timeout in seconds (default: 900)'
 )
 @click.option(
     '--max-size',
     type=int,
-    help='Maximum file size in MB (default: from config)'
+    help='Maximum file size in MB (default: 200)'
 )
 def flatten(
     excel_file,
     output_dir,
     include_computed,
+    include_literal,
+    include_formats,
     origin_repo,
     origin_path,
     origin_commit,
@@ -85,17 +97,29 @@ def flatten(
 
     \b
     Examples:
+      # Basic usage (extracts formulas + literal values + formats)
       flatten workbook.xlsx
-      flatten workbook.xlsm --include-computed
+
+      # Include computed values (formula results)
+      flatten workbook.xlsx --include-computed
+
+      # Only formulas and computed values (no literal values or formats)
+      flatten workbook.xlsx --include-computed --no-literal --no-formats
+
+      # Custom output directory with debug logging
       flatten workbook.xlsx -o ./output --log-level DEBUG
-      flatten workbook.xlsx --origin-repo https://github.com/user/repo
+
+      # With git traceability metadata
+      flatten workbook.xlsx --origin-repo https://github.com/user/repo --origin-commit abc123
     """
     # Load configuration
     config = load_config()
 
-    # Override with CLI arguments
+    # Override with CLI arguments (use config defaults for None values)
     output_dir = output_dir or Path(config['output_dir'])
-    include_computed = include_computed if include_computed is not None else config['include_computed']
+    include_computed = include_computed if include_computed is not None else False
+    include_literal = include_literal if include_literal is not None else True
+    include_formats = include_formats if include_formats is not None else True
     log_level = log_level or config['log_level']
     timeout = timeout if timeout is not None else config['extraction_timeout']
     max_size = max_size if max_size is not None else config['max_file_size_mb']
@@ -108,6 +132,8 @@ def flatten(
     flattener = Flattener(
         output_dir=output_dir,
         include_computed=include_computed,
+        include_literal=include_literal,
+        include_formats=include_formats,
         timeout=timeout,
         max_file_size_mb=max_size
     )

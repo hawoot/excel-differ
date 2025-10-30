@@ -1,46 +1,57 @@
 @echo off
-REM Launcher script for Excel Flattener (Windows)
-REM Automatically sets up virtual environment if needed
+REM =============================================================================
+REM Excel Flattener - Development Launcher (Windows)
+REM =============================================================================
+REM Automatically sets up virtual environment and runs the flattener
+REM
+REM Usage: scripts\run_flattener.bat flatten workbook.xlsx [OPTIONS]
+REM
+REM IMPORTANT: Must run from flattener\ directory (not from scripts\)
+REM   cd C:\path\to\flattener
+REM   scripts\run_flattener.bat flatten workbook.xlsx
+REM =============================================================================
 
 setlocal enabledelayedexpansion
 
-REM Get script directory and move to component root
-set "SCRIPT_DIR=%~dp0"
-cd /d "%SCRIPT_DIR%\.."
+REM =============================================================================
+REM SECTION 1: CONFIGURATION
+REM =============================================================================
 
-REM Configuration
+REM Directory paths
+set "SCRIPT_DIR=%~dp0"
+set "COMPONENT_ROOT=%SCRIPT_DIR%.."
 set "VENV_DIR=venv"
+set "REQUIREMENTS_FILE=%SCRIPT_DIR%requirements.txt"
+
+REM Python command (change if needed)
 set "PYTHON_CMD=python"
 
-REM Check if virtual environment exists
+REM =============================================================================
+REM SECTION 2: VIRTUAL ENVIRONMENT MANAGEMENT
+REM =============================================================================
+
+REM Navigate to component root
+cd /d "%COMPONENT_ROOT%"
+
+REM Check if virtual environment exists, create if needed
 if not exist "%VENV_DIR%\Scripts\activate.bat" (
     echo [!] Virtual environment not found
     echo [*] Creating virtual environment...
+
     %PYTHON_CMD% -m venv %VENV_DIR%
     if errorlevel 1 (
         echo [X] Failed to create virtual environment
-        echo [*] Make sure Python 3.9+ is installed
+        echo     Make sure Python 3.9+ is installed
         exit /b 1
     )
+
     echo [+] Virtual environment created
 )
 
 REM Activate virtual environment
 call "%VENV_DIR%\Scripts\activate.bat"
 
-REM Check if dependencies are installed
-pip show openpyxl >nul 2>&1
-if errorlevel 1 (
-    echo [*] Installing dependencies...
-    pip install -r "%SCRIPT_DIR%\requirements.txt"
-    if errorlevel 1 (
-        echo [X] Failed to install dependencies
-        exit /b 1
-    )
-    echo [+] Dependencies installed
-)
-
-REM Load .env file if it exists
+REM Load .env file if it exists (optional configuration)
 if exist ".env" (
     echo [+] Loading environment from .env
     for /f "usebackq tokens=*" %%a in (".env") do (
@@ -52,11 +63,22 @@ if exist ".env" (
     )
 )
 
-REM Run CLI with all arguments passed through
+REM =============================================================================
+REM SECTION 3: RUN FLATTENER
+REM =============================================================================
+
+REM Run the flattener CLI with all arguments passed through
+REM Example calls:
+REM   scripts\run_flattener.bat flatten workbook.xlsx
+REM   scripts\run_flattener.bat flatten workbook.xlsx --include-computed
+REM   scripts\run_flattener.bat flatten workbook.xlsx -o .\output --log-level DEBUG
+REM   scripts\run_flattener.bat config
+REM   scripts\run_flattener.bat info workbook.xlsx
+REM   scripts\run_flattener.bat --help
+
 python -m src %*
-set "EXIT_CODE=%errorlevel%"
+set EXIT_CODE=%ERRORLEVEL%
 
-REM Deactivate virtual environment
+REM Deactivate virtual environment and exit
 deactivate
-
 exit /b %EXIT_CODE%

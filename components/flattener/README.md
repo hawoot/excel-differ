@@ -172,59 +172,124 @@ The flattener creates a timestamped directory:
         └── ...
 ```
 
-**All files are always created** - even if empty (with headers + "(No X found)"), ensuring consistent structure for scripting and diffing.
+**Note**: Files are only created if their corresponding flag is enabled. By default: formulas (always), literal-values (yes), formats (yes), computed-values (no).
 
 ---
 
 ## Usage Examples
 
-### Basic Usage
+### Quick Reference - Most Common Commands
 
 ```bash
-# Flatten a workbook
+# Basic extraction (formulas + literal values + formats)
 python -m src flatten workbook.xlsx
 
 # Include computed values (formula results)
 python -m src flatten workbook.xlsx --include-computed
 
+# Only formulas and computed values (skip literal values and formats)
+python -m src flatten workbook.xlsx --include-computed --no-literal --no-formats
+
 # Custom output directory
-python -m src flatten workbook.xlsx -o ./my-output
+python -m src flatten workbook.xlsx -o ./output
 
 # Debug logging
 python -m src flatten workbook.xlsx --log-level DEBUG
 ```
 
-### With Git Metadata
+### All CLI Arguments
 
 ```bash
+# Full example with all arguments
 python -m src flatten workbook.xlsx \
+  --output-dir ./output \
+  --include-computed \
+  --include-literal \
+  --include-formats \
+  --log-level DEBUG \
+  --timeout 1800 \
+  --max-size 500 \
   --origin-repo https://github.com/user/repo \
   --origin-commit abc123 \
   --origin-path data/workbook.xlsx \
-  --origin-commit-message "Updated sales data"
+  --origin-commit-message "Updated data"
+```
+
+**Argument Reference**:
+
+| Argument | Short | Default | Description |
+|----------|-------|---------|-------------|
+| `excel_file` | - | *required* | Path to Excel file (.xlsx, .xlsm, .xlsb, .xls) |
+| `--output-dir` | `-o` | `./tmp/flats` | Output directory for flat files |
+| `--include-computed` | - | `False` | Extract computed values (formula results) |
+| `--no-computed` | - | - | Explicitly disable computed values |
+| `--include-literal` | - | `True` | Extract literal values (hardcoded values) |
+| `--no-literal` | - | - | Explicitly disable literal values |
+| `--include-formats` | - | `True` | Extract cell formatting |
+| `--no-formats` | - | - | Explicitly disable formatting |
+| `--log-level` | - | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR) |
+| `--timeout` | - | `900` | Extraction timeout in seconds |
+| `--max-size` | - | `200` | Maximum file size in MB |
+| `--origin-repo` | - | `None` | Git repository URL (for traceability) |
+| `--origin-commit` | - | `None` | Git commit SHA (for traceability) |
+| `--origin-path` | - | `None` | Path in repository (for traceability) |
+| `--origin-commit-message` | - | `None` | Git commit message (for traceability) |
+
+### Extraction Options Examples
+
+```bash
+# Default: formulas + literal values + formats
+python -m src flatten workbook.xlsx
+
+# Add computed values (formula results)
+python -m src flatten workbook.xlsx --include-computed
+
+# Only formulas (no values, no formats)
+python -m src flatten workbook.xlsx --no-literal --no-formats
+
+# Only formulas and literal values (no formats, no computed)
+python -m src flatten workbook.xlsx --no-formats
+
+# Everything (formulas + literal + computed + formats)
+python -m src flatten workbook.xlsx --include-computed
+```
+
+### With Git Traceability
+
+```bash
+# Add git metadata for traceability in manifest.json
+python -m src flatten workbook.xlsx \
+  --origin-repo https://github.com/user/repo \
+  --origin-commit abc123def456 \
+  --origin-path data/sales/workbook.xlsx \
+  --origin-commit-message "Q4 sales data update"
 ```
 
 This metadata gets recorded in `manifest.json` for traceability.
 
-### View File Information
+### Other Commands
 
 ```bash
-# Show file size, hash, validation status
+# View file information (size, hash, validation)
 python -m src info workbook.xlsx
-```
 
-### Show Current Configuration
-
-```bash
-# Display all environment variables and their values
+# Show current configuration (environment variables)
 python -m src config
-```
 
-### Get Help
-
-```bash
+# Get help
 python -m src --help
 python -m src flatten --help
+```
+
+### Using with Launcher Scripts
+
+```bash
+# All the same arguments work with launcher scripts
+./scripts/run_flattener.sh flatten workbook.xlsx --include-computed
+./scripts/run_flattener.sh flatten workbook.xlsx --no-literal --no-formats
+./scripts/run_flattener.sh flatten workbook.xlsx -o ./output --log-level DEBUG
+./scripts/run_flattener.sh config
+./scripts/run_flattener.sh --help
 ```
 
 ---

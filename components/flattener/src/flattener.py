@@ -5,7 +5,7 @@ Coordinates all extraction modules to produce a deterministic, diff-friendly
 text representation of an Excel workbook.
 """
 import logging
-import signal
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, List
@@ -46,6 +46,8 @@ class Flattener:
         self,
         output_dir: Path,
         include_computed: bool = False,
+        include_literal: bool = True,
+        include_formats: bool = True,
         timeout: int = 900,
         max_file_size_mb: int = 200
     ):
@@ -54,12 +56,16 @@ class Flattener:
 
         Args:
             output_dir: Directory to write flat outputs
-            include_computed: Whether to extract computed values
-            timeout: Maximum extraction time in seconds
-            max_file_size_mb: Maximum file size in MB
+            include_computed: Whether to extract computed values (formula results) [default: False]
+            include_literal: Whether to extract literal values (hardcoded values) [default: True]
+            include_formats: Whether to extract cell formatting [default: True]
+            timeout: Maximum extraction time in seconds [default: 900]
+            max_file_size_mb: Maximum file size in MB [default: 200]
         """
         self.output_dir = Path(output_dir)
         self.include_computed = include_computed
+        self.include_literal = include_literal
+        self.include_formats = include_formats
         self.timeout = timeout
         self.max_file_size_mb = max_file_size_mb
 
@@ -97,74 +103,95 @@ class Flattener:
         # Validate file
         self._validate_file(excel_file)
 
-        # Setup timeout handler
-        if self.timeout > 0:
-            signal.signal(signal.SIGALRM, self._timeout_handler)
-            signal.alarm(self.timeout)
+        # Setup timeout handler (platform-independent)
+        timeout_event = threading.Event()
+        result_container = {'flat_root': None, 'error': None}
 
-        try:
-            logger.info(f"=" * 70)
-            logger.info(f"Starting extraction: {excel_file.name}")
-            logger.info(f"=" * 70)
+        def extraction_task():
+            """Extraction task to run with timeout."""
+            try:
+                logger.info(f"=" * 70)
+                logger.info(f"Starting extraction: {excel_file.name}")
+                logger.info(f"=" * 70)
 
-            # Calculate file hash
-            file_hash = get_file_hash(excel_file)
-            logger.info(f"File hash: {file_hash[:16]}...")
+                # Calculate file hash
+                file_hash = get_file_hash(excel_file)
+                logger.info(f"File hash: {file_hash[:16]}...")
 
-            # Create flat root directory
-            timestamp = datetime.now(timezone.utc)
-            flat_root_name = create_flat_root_name(excel_file.stem, timestamp, file_hash[:8])
-            flat_root = self.output_dir / flat_root_name
-            flat_root.mkdir(parents=True, exist_ok=True)
+                # Create flat root directory
+                timestamp = datetime.now(timezone.utc)
+                flat_root_name = create_flat_root_name(excel_file.stem, timestamp, file_hash[:8])
+                flat_root = self.output_dir / flat_root_name
+                flat_root.mkdir(parents=True, exist_ok=True)
 
-            logger.info(f"Flat root: {flat_root}")
+                logger.info(f"Flat root: {flat_root}")
 
-            # Initialise manifest
-            manifest = Manifest(
-                workbook_filename=excel_file.name,
-                original_sha256=file_hash,
-                include_computed=self.include_computed
-            )
-
-            # Set origin if provided
-            if origin_repo or origin_path or origin_commit:
-                manifest.set_origin(
-                    origin_repo=origin_repo,
-                    origin_path=origin_path,
-                    origin_commit=origin_commit,
-                    origin_commit_message=origin_commit_message
+                # Initialise manifest
+                manifest = Manifest(
+                    workbook_filename=excel_file.name,
+                    original_sha256=file_hash,
+                    include_computed=self.include_computed
                 )
 
-            # Load workbook
-            logger.info("Loading workbook...")
-            wb = self._load_workbook(excel_file)
+                # Set origin if provided
+                if origin_repo or origin_path or origin_commit:
+                    manifest.set_origin(
+                        origin_repo=origin_repo,
+                        origin_path=origin_path,
+                        origin_commit=origin_commit,
+                        origin_commit_message=origin_commit_message
+                    )
 
-            # Extract all components
-            self._extract_metadata(wb, flat_root, manifest)
-            self._extract_structure(wb, flat_root, manifest)
-            self._extract_sheets(wb, flat_root, manifest)
-            self._extract_vba(excel_file, flat_root, manifest)
-            self._extract_tables(wb, flat_root, manifest)
-            self._extract_charts(wb, flat_root, manifest)
-            self._extract_named_ranges(wb, flat_root, manifest)
+                # Load workbook
+                logger.info("Loading workbook...")
+                wb = self._load_workbook(excel_file)
 
-            # Save manifest
-            manifest_path = flat_root / 'manifest.json'
-            manifest.save(manifest_path)
-            manifest.add_file(manifest_path, flat_root)
+                # Extract all components
+                self._extract_metadata(wb, flat_root, manifest)
+                self._extract_structure(wb, flat_root, manifest)
+                self._extract_sheets(wb, flat_root, manifest)
+                self._extract_vba(excel_file, flat_root, manifest)
+                self._extract_tables(wb, flat_root, manifest)
+                self._extract_charts(wb, flat_root, manifest)
+                self._extract_named_ranges(wb, flat_root, manifest)
 
-            logger.info(f"=" * 70)
-            logger.info(f"✓ Extraction complete: {flat_root_name}")
-            logger.info(f"  Total files: {len(manifest.files)}")
-            logger.info(f"  Warnings: {len(manifest.warnings)}")
-            logger.info(f"=" * 70)
+                # Save manifest
+                manifest_path = flat_root / 'manifest.json'
+                manifest.save(manifest_path)
+                manifest.add_file(manifest_path, flat_root)
 
-            return flat_root
+                logger.info(f"=" * 70)
+                logger.info(f"✓ Extraction complete: {flat_root_name}")
+                logger.info(f"  Total files: {len(manifest.files)}")
+                logger.info(f"  Warnings: {len(manifest.warnings)}")
+                logger.info(f"=" * 70)
 
-        finally:
-            # Cancel timeout
-            if self.timeout > 0:
-                signal.alarm(0)
+                result_container['flat_root'] = flat_root
+
+            except Exception as e:
+                result_container['error'] = e
+            finally:
+                timeout_event.set()
+
+        # Run extraction with timeout
+        if self.timeout > 0:
+            thread = threading.Thread(target=extraction_task, daemon=True)
+            thread.start()
+            thread.join(timeout=self.timeout)
+
+            if thread.is_alive():
+                # Timeout occurred
+                logger.error(f"Extraction exceeded timeout of {self.timeout}s")
+                raise TimeoutError(f"Extraction exceeded timeout of {self.timeout}s")
+        else:
+            # No timeout - run directly
+            extraction_task()
+
+        # Check for errors
+        if result_container['error']:
+            raise result_container['error']
+
+        return result_container['flat_root']
 
     def _validate_file(self, file_path: Path) -> None:
         """
@@ -285,24 +312,26 @@ class Flattener:
                 write_formulas_file(sheet_name, formulas, formulas_path)
                 manifest.add_file(formulas_path, flat_root)
 
-                # Extract literal values - ALWAYS create file
-                literal_values = extractor.extract_literal_values()
-                literal_path = sheet_dir / 'literal-values.txt'
-                write_values_file(sheet_name, literal_values, literal_path, file_type='literal')
-                manifest.add_file(literal_path, flat_root)
+                # Extract literal values - create file if enabled (default: True)
+                if self.include_literal:
+                    literal_values = extractor.extract_literal_values()
+                    literal_path = sheet_dir / 'literal-values.txt'
+                    write_values_file(sheet_name, literal_values, literal_path, file_type='literal')
+                    manifest.add_file(literal_path, flat_root)
 
-                # Extract computed values - ALWAYS create file if enabled
+                # Extract computed values - create file if enabled (default: False)
                 if self.include_computed:
                     computed_values = extractor.extract_computed_values()
                     computed_path = sheet_dir / 'computed-values.txt'
                     write_values_file(sheet_name, computed_values, computed_path, file_type='computed')
                     manifest.add_file(computed_path, flat_root)
 
-                # Extract formats - ALWAYS create file
-                formats = extractor.extract_formats()
-                formats_path = sheet_dir / 'formats.txt'
-                write_formats_file(sheet_name, formats, formats_path)
-                manifest.add_file(formats_path, flat_root)
+                # Extract formats - create file if enabled (default: True)
+                if self.include_formats:
+                    formats = extractor.extract_formats()
+                    formats_path = sheet_dir / 'formats.txt'
+                    write_formats_file(sheet_name, formats, formats_path)
+                    manifest.add_file(formats_path, flat_root)
 
             except Exception as e:
                 logger.error(f"Error extracting sheet {sheet_name}: {e}", exc_info=True)
@@ -415,7 +444,3 @@ class Flattener:
             sanitised = 'sheet'
 
         return sanitised
-
-    def _timeout_handler(self, signum, frame):
-        """Handle timeout signal."""
-        raise TimeoutError(f"Extraction exceeded timeout of {self.timeout}s")

@@ -1,32 +1,61 @@
 #!/usr/bin/env bash
-# Build script for Excel Flattener (Linux/Mac)
+# =============================================================================
+# Excel Flattener - Build Script (Linux/Mac)
+# =============================================================================
 # Creates a single-file executable using PyInstaller
+#
+# Usage: ./scripts/build_package.sh
+#
+# IMPORTANT: Must run from flattener/ directory (not from scripts/)
+#   cd /path/to/flattener/
+#   ./scripts/build_package.sh
+#
+# Output: dist/excel-flattener (standalone executable)
+# =============================================================================
 
-set -e
+set -e  # Exit on error
 
-# Get script directory and move to component root
+# =============================================================================
+# SECTION 1: CONFIGURATION
+# =============================================================================
+
+# Directory paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR/.."
+COMPONENT_ROOT="$SCRIPT_DIR/.."
+VENV_DIR="venv"
+DIST_DIR="dist"
+BUILD_DIR="build"
+REQUIREMENTS_FILE="$SCRIPT_DIR/requirements.txt"
 
-# Colours for output
+# Python command (change if needed)
+PYTHON_CMD="python3"
+
+# Entry point for PyInstaller
+ENTRY_POINT="src/__main__.py"
+
+# Executable name
+EXECUTABLE_NAME="excel-flattener"
+
+# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Colour
+NC='\033[0m'  # No Color
+
+# =============================================================================
+# SECTION 2: VIRTUAL ENVIRONMENT & DEPENDENCIES
+# =============================================================================
 
 echo -e "${BLUE}====================================${NC}"
 echo -e "${BLUE}Excel Flattener - Build Script${NC}"
 echo -e "${BLUE}====================================${NC}"
 echo
 
-# Configuration
-VENV_DIR="venv"
-DIST_DIR="dist"
-BUILD_DIR="build"
-PYTHON_CMD="python3"
+# Navigate to component root
+cd "$COMPONENT_ROOT"
 
-# Check if virtual environment exists
+# Check if virtual environment exists, create if needed
 if [ ! -f "$VENV_DIR/bin/activate" ]; then
     echo -e "${YELLOW}[*] Creating virtual environment...${NC}"
 
@@ -42,9 +71,10 @@ fi
 source "$VENV_DIR/bin/activate"
 
 # Install dependencies
-echo -e "${YELLOW}[*] Installing dependencies...${NC}"
-if ! pip install -r "$SCRIPT_DIR/requirements.txt"; then
+echo -e "${YELLOW}[*] Installing dependencies from $REQUIREMENTS_FILE...${NC}"
+if ! pip install -r "$REQUIREMENTS_FILE"; then
     echo -e "${RED}[X] Failed to install dependencies${NC}"
+    deactivate
     exit 1
 fi
 
@@ -52,22 +82,36 @@ fi
 echo -e "${YELLOW}[*] Installing PyInstaller...${NC}"
 if ! pip install pyinstaller; then
     echo -e "${RED}[X] Failed to install PyInstaller${NC}"
+    deactivate
     exit 1
 fi
 
 # Clean previous builds
 if [ -d "$DIST_DIR" ] || [ -d "$BUILD_DIR" ]; then
-    echo -e "${YELLOW}[*] Cleaning previous build...${NC}"
-    rm -rf "$DIST_DIR" "$BUILD_DIR" excel-flattener.spec
+    echo -e "${YELLOW}[*] Cleaning previous build artifacts...${NC}"
+    rm -rf "$DIST_DIR" "$BUILD_DIR" "$EXECUTABLE_NAME.spec"
 fi
 
-# Build executable
+# =============================================================================
+# SECTION 3: BUILD EXECUTABLE
+# =============================================================================
+
 echo -e "${YELLOW}[*] Building executable with PyInstaller...${NC}"
 echo
 
+# Build with PyInstaller
+# --onefile             Single executable file
+# --name                Output executable name
+# --console             Console application (not GUI)
+# --clean               Clean PyInstaller cache
+# --noconfirm           Overwrite output without confirmation
+# --hidden-import       Explicitly include modules PyInstaller might miss
+# --collect-data        Bundle data files from package
+# Entry point: src/__main__.py
+
 pyinstaller \
     --onefile \
-    --name excel-flattener \
+    --name "$EXECUTABLE_NAME" \
     --console \
     --clean \
     --noconfirm \
@@ -83,8 +127,9 @@ pyinstaller \
     --hidden-import=click \
     --hidden-import=dotenv \
     --collect-data openpyxl \
-    src/__main__.py
+    "$ENTRY_POINT"
 
+# Check if build succeeded
 if [ $? -ne 0 ]; then
     echo
     echo -e "${RED}[X] Build failed${NC}"
@@ -92,19 +137,22 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# Deactivate virtual environment
+deactivate
+
+# Show success message
 echo
 echo -e "${GREEN}====================================${NC}"
 echo -e "${GREEN}[+] Build successful!${NC}"
 echo -e "${GREEN}====================================${NC}"
 echo
-echo -e "Executable: ${YELLOW}$(pwd)/$DIST_DIR/excel-flattener${NC}"
+echo -e "Executable: ${YELLOW}$(pwd)/$DIST_DIR/$EXECUTABLE_NAME${NC}"
 echo
 echo "Usage:"
-echo "  ./dist/excel-flattener flatten workbook.xlsx"
-echo "  ./dist/excel-flattener --help"
+echo "  ./dist/$EXECUTABLE_NAME flatten workbook.xlsx"
+echo "  ./dist/$EXECUTABLE_NAME flatten workbook.xlsx --include-computed -o ./output"
+echo "  ./dist/$EXECUTABLE_NAME config"
+echo "  ./dist/$EXECUTABLE_NAME --help"
 echo
-
-# Deactivate virtual environment
-deactivate
 
 exit 0

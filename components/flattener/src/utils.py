@@ -34,7 +34,6 @@ def load_config():
         'output_dir': Path(os.getenv('FLATTENER_OUTPUT_DIR', './tmp/flats')),
         'log_dir': os.getenv('FLATTENER_LOG_DIR', './tmp/logs'),
         'log_level': os.getenv('FLATTENER_LOG_LEVEL', 'INFO').upper(),
-        'include_computed': os.getenv('FLATTENER_INCLUDE_COMPUTED', 'false').lower() == 'true',
         'extraction_timeout': int(os.getenv('FLATTENER_EXTRACTION_TIMEOUT', '900')),
         'max_file_size_mb': int(os.getenv('FLATTENER_MAX_FILE_SIZE_MB', '200')),
         'temp_dir': os.getenv('FLATTENER_TEMP_DIR', './tmp/temp'),
