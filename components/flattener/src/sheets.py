@@ -55,11 +55,19 @@ class SheetExtractor:
                 if cell.data_type == 'f':  # Formula
                     formula_value = cell.value
                     if formula_value:
-                        # Convert to string (handles ArrayFormula objects, etc.)
-                        formula_str = str(formula_value)
+                        # Extract formula text
+                        # - If string: use as-is
+                        # - If ArrayFormula object: use .text attribute
+                        # - Otherwise: convert to string
+                        if isinstance(formula_value, str):
+                            formula_str = formula_value
+                        elif hasattr(formula_value, 'text'):
+                            formula_str = formula_value.text
+                        else:
+                            formula_str = str(formula_value)
 
                         # Ensure leading =
-                        if not formula_str.startswith('='):
+                        if formula_str and not formula_str.startswith('='):
                             formula_str = f'={formula_str}'
 
                         formulas.append({
