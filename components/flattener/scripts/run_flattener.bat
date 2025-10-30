@@ -4,11 +4,11 @@ REM Excel Flattener - Development Launcher (Windows)
 REM =============================================================================
 REM Automatically sets up virtual environment and runs the flattener
 REM
-REM Usage: scripts\run_flattener.bat flatten workbook.xlsx [OPTIONS]
+REM Usage: scripts\run_flattener.bat flatten .\snippets\sample.xlsx [OPTIONS]
 REM
 REM IMPORTANT: Must run from flattener\ directory (not from scripts\)
 REM   cd C:\path\to\flattener
-REM   scripts\run_flattener.bat flatten workbook.xlsx
+REM   scripts\run_flattener.bat flatten .\snippets\sample.xlsx
 REM =============================================================================
 
 setlocal enabledelayedexpansion
@@ -69,11 +69,21 @@ REM ============================================================================
 
 REM Run the flattener CLI with all arguments passed through
 REM Example calls:
-REM   scripts\run_flattener.bat flatten workbook.xlsx
-REM   scripts\run_flattener.bat flatten workbook.xlsx --include-computed
-REM   scripts\run_flattener.bat flatten workbook.xlsx -o .\output --log-level DEBUG
+REM   cd components\flattener
+REM   scripts\run_flattener.bat flatten .\snippets\sample.xlsx
+REM Minimal options:
+REM   scripts\run_flattener.bat flatten .\snippets\sample.xlsx --no-computed --no-formats --no-literal
+REM Default options:
+REM   scripts\run_flattener.bat flatten .\snippets\sample.xlsx --no-computed --include-literal --include-formats
+
+REM Debugging options:
+REM   scripts\run_flattener.bat flatten .\snippets\sample.xlsx -o ./output --log-level DEBUG
+
+REM With commit options:
+REM   scripts\run_flattener.bat flatten .\snippets\sample.xlsx --origin-repo repo_name --origin-path /dir1/file1 --origin-commit commitId --origin-commit-message "Update flattened data"
+
 REM   scripts\run_flattener.bat config
-REM   scripts\run_flattener.bat info workbook.xlsx
+REM   scripts\run_flattener.bat info .\snippets\sample.xlsx
 REM   scripts\run_flattener.bat --help
 
 python -m src %*

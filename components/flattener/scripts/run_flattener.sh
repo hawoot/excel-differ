@@ -4,11 +4,11 @@
 # =============================================================================
 # Automatically sets up virtual environment and runs the flattener
 #
-# Usage: ./scripts/run_flattener.sh flatten workbook.xlsx [OPTIONS]
+# Usage: ./scripts/run_flattener.sh flatten ./snippets/sample.xlsx [OPTIONS]
 #
 # IMPORTANT: Must run from flattener/ directory (not from scripts/)
 #   cd /path/to/flattener/
-#   ./scripts/run_flattener.sh flatten workbook.xlsx
+#   ./scripts/run_flattener.sh flatten ./snippets/sample.xlsx
 # =============================================================================
 
 set -e  # Exit on error
@@ -70,11 +70,22 @@ fi
 
 # Run the flattener CLI with all arguments passed through
 # Example calls:
-#   ./scripts/run_flattener.sh flatten workbook.xlsx
-#   ./scripts/run_flattener.sh flatten workbook.xlsx --include-computed
-#   ./scripts/run_flattener.sh flatten workbook.xlsx -o ./output --log-level DEBUG
+#   cd components/flattener
+#   ./scripts/run_flattener.sh flatten ./snippets/sample.xlsx
+
+# Minimal options:
+#   ./scripts/run_flattener.sh flatten ./snippets/sample.xlsx --no-computed --no-formats --no-literal
+# Default options:
+#   ./scripts/run_flattener.sh flatten ./snippets/sample.xlsx --no-computed --include-literal --include-formats
+
+# Debugging options:
+#   ./scripts/run_flattener.sh flatten ./snippets/sample.xlsx -o ./output --log-level DEBUG
+
+# With commit options:
+#   ./scripts/run_flattener.sh flatten ./snippets/sample.xlsx --origin-repo repo_name --origin-path /dir1/file1 --origin-commit commitId --origin-commit-message "Update flattened data"
+
 #   ./scripts/run_flattener.sh config
-#   ./scripts/run_flattener.sh info workbook.xlsx
+#   ./scripts/run_flattener.sh info ./snippets/sample.xlsx
 #   ./scripts/run_flattener.sh --help
 
 python -m src "$@"
