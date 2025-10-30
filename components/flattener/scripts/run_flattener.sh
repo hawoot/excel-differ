@@ -55,6 +55,13 @@ fi
 
 # Activate virtual environment
 source "$VENV_DIR/bin/activate"
+# Install dependencies
+echo -e "${YELLOW}[*] Installing dependencies from $REQUIREMENTS_FILE...${NC}"
+if ! pip install -r "$REQUIREMENTS_FILE"; then
+    echo -e "${RED}[X] Failed to install dependencies${NC}"
+    deactivate
+    exit 1
+fi
 
 # Load .env file if it exists (optional configuration)
 if [ -f ".env" ]; then

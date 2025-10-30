@@ -50,6 +50,9 @@ if not exist "%VENV_DIR%\Scripts\activate.bat" (
 
 REM Activate virtual environment
 call "%VENV_DIR%\Scripts\activate.bat"
+REM Install dependencies
+echo [*] Installing dependencies from %REQUIREMENTS_FILE%...
+pip install -r "%REQUIREMENTS_FILE%"
 
 REM Load .env file if it exists (optional configuration)
 if exist ".env" (
