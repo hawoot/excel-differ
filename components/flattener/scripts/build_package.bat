@@ -80,8 +80,7 @@ pyinstaller ^
     --hidden-import=click ^
     --hidden-import=dotenv ^
     --collect-data openpyxl ^
-    --add-data "src;src" ^
-    -m src
+    src\__main__.py
 
 if errorlevel 1 (
     echo.

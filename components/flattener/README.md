@@ -28,39 +28,120 @@ Excel Flattener extracts everything from an Excel file into organised text files
 
 ## Quick Start
 
-### Option 1: Run from Source (Development)
+### Option 1: Run from Source (Easiest for Development)
 
+**Requirements**:
+- Python 3.9+ installed
+- Located in the `flattener/` directory
+- Excel file to flatten (e.g., `workbook.xlsx`)
+
+**Linux/Mac:**
 ```bash
-# Linux/Mac - launcher handles everything (venv, deps, run)
+cd /path/to/flattener/
 ./scripts/run_flattener.sh flatten workbook.xlsx
+```
 
-# Windows
+**Windows:**
+```cmd
+cd C:\path\to\flattener
 scripts\run_flattener.bat flatten workbook.xlsx
 ```
 
-The launcher scripts automatically set up a virtual environment and install dependencies.
+**What the launcher scripts do:**
+1. Check if `venv/` exists; if not, create it with `python3 -m venv venv`
+2. Activate the virtual environment
+3. Check if dependencies are installed; if not, run `pip install -r scripts/requirements.txt`
+4. Load `.env` file if present
+5. Run `python -m src <your-arguments>`
+6. Deactivate virtual environment on exit
 
-### Option 2: Run with Python
+**First run** takes ~30 seconds to set up the environment. Subsequent runs are instant.
+
+### Option 2: Run with Python Directly
+
+**Requirements**:
+- Python 3.9+ installed
+- Located in the `flattener/` directory
 
 ```bash
-# Setup once
+# Setup once (manual)
+cd /path/to/flattener/
 python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source venv/bin/activate           # Linux/Mac
+# OR
+venv\Scripts\activate               # Windows
+
 pip install -r scripts/requirements.txt
 
-# Flatten a workbook
+# Run the flattener
 python -m src flatten workbook.xlsx
+
+# When done (optional)
+deactivate
 ```
 
-### Option 3: Standalone Executable (Distribution)
+**When to use this:**
+- You want full control over the Python environment
+- You're integrating into existing automation
+- You're debugging or developing
+
+### Option 3: Standalone Executable (Best for Distribution)
+
+**Build Requirements**:
+- Python 3.9+ with **shared library support** (`--enable-shared` flag when building Python)
+- Located in the `flattener/` directory
+
+**⚠️ Important**: PyInstaller requires Python built with shared libraries. Standard Python installations on Windows and Mac have this. Some Linux/Docker environments may not.
+
+**To check if your Python supports PyInstaller:**
+```bash
+python3 -c "import sysconfig; print(sysconfig.get_config_var('Py_ENABLE_SHARED'))"
+# Should output: 1 (supported) or 0 (not supported)
+```
+
+**Build the executable:**
+
+**Linux/Mac:**
+```bash
+cd /path/to/flattener/
+./scripts/build_package.sh
+```
+
+**Windows:**
+```cmd
+cd C:\path\to\flattener
+scripts\build_package.bat
+```
+
+**What the build scripts do:**
+1. Create `venv/` if it doesn't exist
+2. Install dependencies from `scripts/requirements.txt`
+3. Install PyInstaller
+4. Clean previous builds (`dist/`, `build/`, `*.spec`)
+5. Run PyInstaller with optimised settings:
+   - `--onefile`: Single executable file
+   - `--console`: Console application (not GUI)
+   - `--hidden-import`: Include all required modules
+   - `--collect-data`: Bundle openpyxl data files
+6. Create executable in `dist/excel-flattener` (or `dist/excel-flattener.exe` on Windows)
+
+**Build time**: ~2-5 minutes (first build), ~1-2 minutes (subsequent builds)
+
+**Use the executable:**
 
 ```bash
-# Build executable (creates dist/excel-flattener)
-./scripts/build_package.sh  # Windows: scripts\build_package.bat
-
-# Use executable (no Python required)
+# Linux/Mac
 ./dist/excel-flattener flatten workbook.xlsx
+
+# Windows
+dist\excel-flattener.exe flatten workbook.xlsx
 ```
+
+**Distribute the executable:**
+- Copy just the `dist/excel-flattener` (or `.exe`) file to any machine
+- No Python installation required on target machine
+- User can run it directly: `./excel-flattener flatten workbook.xlsx`
+- User must create their own `.env` file if they want custom configuration (or use environment variables)
 
 ---
 
@@ -284,7 +365,107 @@ This ensures meaningful diffs while maintaining data fidelity.
 
 ## Troubleshooting
 
-### "File too large"
+### Script Issues
+
+#### "Permission denied" when running scripts (Linux/Mac)
+
+Make scripts executable:
+
+```bash
+chmod +x scripts/run_flattener.sh scripts/build_package.sh
+```
+
+#### "python3: command not found"
+
+Install Python 3.9+ or update the script to use your Python command:
+
+```bash
+# Check your Python version
+python --version
+python3 --version
+
+# Edit PYTHON_CMD in the script if needed
+# For example, change "python3" to "python"
+```
+
+#### Scripts don't find `src` module
+
+**Must run scripts from the `flattener/` directory** (not from `scripts/`):
+
+```bash
+# ✓ Correct
+cd /path/to/flattener/
+./scripts/run_flattener.sh flatten workbook.xlsx
+
+# ✗ Wrong
+cd /path/to/flattener/scripts/
+./run_flattener.sh flatten workbook.xlsx  # Will fail!
+```
+
+#### Virtual environment not activating on Windows
+
+Use the correct activation command:
+
+```cmd
+REM Windows CMD
+venv\Scripts\activate.bat
+
+REM Windows PowerShell
+venv\Scripts\Activate.ps1
+```
+
+If PowerShell gives execution policy errors:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+### Build Issues
+
+#### "Python was built without a shared library"
+
+Your Python installation doesn't support PyInstaller. Solutions:
+
+1. **Install Python from python.org** (Windows/Mac) - includes shared libraries
+2. **Use system package manager** (Linux):
+   ```bash
+   sudo apt-get install python3-dev  # Ubuntu/Debian
+   sudo yum install python3-devel    # CentOS/RHEL
+   ```
+3. **Build Python from source with `--enable-shared`**:
+   ```bash
+   ./configure --enable-shared
+   make
+   sudo make install
+   ```
+4. **Use Docker with proper Python base image**:
+   ```dockerfile
+   FROM python:3.12-slim  # Has shared libraries
+   ```
+
+To verify your Python has shared library support:
+
+```bash
+python3 -c "import sysconfig; print(sysconfig.get_config_var('Py_ENABLE_SHARED'))"
+# Should output: 1
+```
+
+#### Build succeeds but executable doesn't run
+
+```bash
+# Clear everything and rebuild
+rm -rf venv build dist *.spec
+./scripts/build_package.sh
+
+# Test executable
+./dist/excel-flattener --help
+```
+
+If it still fails, check the build log for missing modules and add them as `--hidden-import` in [build_package.sh](scripts/build_package.sh).
+
+### Runtime Issues
+
+#### "File too large"
 
 Increase `FLATTENER_MAX_FILE_SIZE_MB`:
 
@@ -293,13 +474,44 @@ export FLATTENER_MAX_FILE_SIZE_MB=500
 python -m src flatten large-workbook.xlsx
 ```
 
-### "Extraction exceeded timeout"
+#### "Extraction exceeded timeout"
 
 Increase `FLATTENER_EXTRACTION_TIMEOUT`:
 
 ```bash
 export FLATTENER_EXTRACTION_TIMEOUT=1800  # 30 minutes
 python -m src flatten complex-workbook.xlsx
+```
+
+#### Logs not appearing in ./tmp/logs/
+
+Check that:
+1. You're running from the `flattener/` directory
+2. The directory has write permissions
+3. `FLATTENER_LOG_DIR` is not set to a different location
+
+```bash
+# Check current config
+python -m src config
+
+# Explicitly set log directory
+export FLATTENER_LOG_DIR=./tmp/logs
+python -m src flatten workbook.xlsx
+
+# Check logs
+ls -la ./tmp/logs/
+```
+
+#### "Module not found" errors
+
+Dependencies not installed:
+
+```bash
+# With launcher scripts (automatic)
+./scripts/run_flattener.sh flatten workbook.xlsx
+
+# Manual installation
+pip install -r scripts/requirements.txt
 ```
 
 ### Virtual Environment Issues
@@ -312,23 +524,6 @@ rm -rf venv
 python3 -m venv venv
 source venv/bin/activate
 pip install -r scripts/requirements.txt
-```
-
-### Build Issues
-
-```bash
-# Clear PyInstaller cache
-rm -rf build dist *.spec
-
-# Rebuild
-./scripts/build_package.sh
-```
-
-### Permission Errors (Linux/Mac)
-
-```bash
-# Make scripts executable
-chmod +x scripts/run_flattener.sh scripts/build_package.sh
 ```
 
 ---

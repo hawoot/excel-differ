@@ -316,58 +316,271 @@ def __init__(self, ..., include_conditional_formatting: bool = False):
 
 ## Build & Distribution
 
-### Development Workflow
+### Development Scripts
 
+#### run_flattener.sh / run_flattener.bat
+
+**Location**: `scripts/run_flattener.sh` (Linux/Mac) or `scripts/run_flattener.bat` (Windows)
+
+**Purpose**: Development launcher that handles environment setup automatically
+
+**How it works:**
+
+1. **Navigate to component root**
+   ```bash
+   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+   cd "$SCRIPT_DIR/.."  # Move to flattener/
+   ```
+
+2. **Check/create virtual environment**
+   - Looks for `venv/bin/activate` (Linux/Mac) or `venv\Scripts\activate.bat` (Windows)
+   - If missing, creates with `python3 -m venv venv`
+
+3. **Activate virtual environment**
+   ```bash
+   source "$VENV_DIR/bin/activate"  # Linux/Mac
+   ```
+
+4. **Check/install dependencies**
+   - Tests if `openpyxl` is installed (proxy for all dependencies)
+   - If missing, runs `pip install -r scripts/requirements.txt`
+
+5. **Load .env file** (if exists)
+   ```bash
+   set -a
+   source .env
+   set +a
+   ```
+
+6. **Run Python module**
+   ```bash
+   python -m src "$@"  # Pass all arguments through
+   ```
+
+7. **Deactivate and exit**
+   ```bash
+   deactivate
+   exit $EXIT_CODE
+   ```
+
+**Usage:**
 ```bash
-# Setup (first time)
-./scripts/run_flattener.sh --help
-
-# Run from source
-./scripts/run_flattener.sh flatten workbook.xlsx
-
-# Or directly
-python -m src flatten workbook.xlsx
+# Must run from flattener/ directory
+cd /path/to/flattener/
+./scripts/run_flattener.sh flatten workbook.xlsx --log-level DEBUG
 ```
 
-### Building Executable
+**Key variables:**
+- `VENV_DIR="venv"` - Virtual environment directory name
+- `PYTHON_CMD="python3"` - Python command to use
+- Colours for output: `RED`, `GREEN`, `YELLOW`, `NC` (no colour)
 
+#### build_package.sh / build_package.bat
+
+**Location**: `scripts/build_package.sh` (Linux/Mac) or `scripts/build_package.bat` (Windows)
+
+**Purpose**: Build standalone executable using PyInstaller
+
+**How it works:**
+
+1. **Navigate to component root**
+   ```bash
+   cd "$SCRIPT_DIR/.."
+   ```
+
+2. **Create/activate virtual environment** (same as run_flattener)
+
+3. **Install dependencies**
+   ```bash
+   pip install -r "$SCRIPT_DIR/requirements.txt"
+   ```
+
+4. **Install PyInstaller**
+   ```bash
+   pip install pyinstaller
+   ```
+
+5. **Clean previous builds**
+   ```bash
+   rm -rf "$DIST_DIR" "$BUILD_DIR" excel-flattener.spec
+   ```
+
+6. **Run PyInstaller**
+   ```bash
+   pyinstaller \
+       --onefile \                    # Single file output
+       --name excel-flattener \       # Executable name
+       --console \                    # Console app (not GUI)
+       --clean \                      # Clean cache
+       --noconfirm \                  # Overwrite without asking
+       --hidden-import=openpyxl \     # Include modules PyInstaller might miss
+       --hidden-import=openpyxl.cell \
+       --hidden-import=openpyxl.styles \
+       --hidden-import=openpyxl.chart \
+       --hidden-import=openpyxl.worksheet \
+       --hidden-import=lxml \
+       --hidden-import=lxml.etree \
+       --hidden-import=oletools \
+       --hidden-import=oletools.olevba \
+       --hidden-import=click \
+       --hidden-import=dotenv \
+       --collect-data openpyxl \      # Bundle openpyxl data files
+       src/__main__.py                # Entry point script
+   ```
+
+7. **Report results**
+   - Shows path to executable: `dist/excel-flattener` (or `.exe` on Windows)
+   - Shows usage examples
+
+**Usage:**
 ```bash
-# Build
+# Must run from flattener/ directory
+cd /path/to/flattener/
 ./scripts/build_package.sh
 
-# Output
-dist/
-├── excel-flattener         # Single-file executable
-└── build/                  # Build artifacts (can delete)
+# Test the built executable
+./dist/excel-flattener --help
+./dist/excel-flattener flatten workbook.xlsx
 ```
 
-### PyInstaller Configuration
+**Output structure:**
+```
+flattener/
+├── dist/
+│   └── excel-flattener          # The executable (distribute this)
+├── build/                        # Build artifacts (can delete)
+│   └── excel-flattener/         # Intermediate files
+└── excel-flattener.spec         # PyInstaller spec file (can delete)
+```
 
-Build scripts use these key options:
-- `--onefile` - Single executable (slower startup, but portable)
-- `--console` - Console application (not GUI)
-- `--hidden-import` - Explicitly include modules PyInstaller might miss
-- `--collect-data openpyxl` - Include openpyxl data files
-- `--add-data "src:src"` - Bundle source code
+**Key variables:**
+- `VENV_DIR="venv"` - Virtual environment directory
+- `DIST_DIR="dist"` - Output directory for executable
+- `BUILD_DIR="build"` - Build artifacts directory
+- `PYTHON_CMD="python3"` - Python command
+
+**Requirements:**
+- Python must be built with shared library support (`--enable-shared`)
+- Check with: `python3 -c "import sysconfig; print(sysconfig.get_config_var('Py_ENABLE_SHARED'))"`
+- Should output `1` (supported) or `0` (not supported)
+
+**Common issues:**
+1. **"Python was built without a shared library"**
+   - Install Python from python.org (Windows/Mac)
+   - Use system package manager (Linux): `apt-get install python3-dev`
+   - Use Docker image: `FROM python:3.12-slim`
+
+2. **Build succeeds but executable fails**
+   - Add missing modules as `--hidden-import=module.name` in build script
+   - Check build log for import errors
+
+3. **Executable is very large (>100MB)**
+   - Normal! PyInstaller bundles Python + all dependencies
+   - Typical size: 50-150MB depending on dependencies
+
+### Development Workflow
+
+**Daily development:**
+```bash
+# Run tests/experiments
+./scripts/run_flattener.sh flatten test-file.xlsx
+
+# Or activate venv once and work directly
+source venv/bin/activate
+python -m src flatten workbook.xlsx
+python -m src config
+python -m src info workbook.xlsx
+deactivate
+```
+
+**Before committing:**
+```bash
+# Test clean build
+rm -rf venv build dist *.spec
+./scripts/run_flattener.sh flatten sample.xlsx
+
+# Verify output structure
+tree tmp/flats/ -L 3
+```
+
+**Before releasing:**
+```bash
+# Build executable
+./scripts/build_package.sh
+
+# Test executable
+./dist/excel-flattener --help
+./dist/excel-flattener flatten snippets/sample.xlsx
+
+# Verify it works without Python environment
+deactivate
+unset PYTHONPATH
+./dist/excel-flattener flatten snippets/sample.xlsx
+```
 
 ### Distribution Options
 
-**Option 1: Source**
-- Share entire `flattener/` folder
-- Users run `./scripts/run_flattener.sh`
-- Requires Python 3.9+
+**Option 1: Source Distribution**
+- Share entire `flattener/` folder (or zip/tar.gz)
+- Users run `./scripts/run_flattener.sh` (auto-setup)
+- **Requirements**: Python 3.9+
+- **Pros**: Easy to modify, cross-platform
+- **Cons**: Requires Python installation
 
-**Option 2: Binary (Recommended)**
-- Share just `dist/` folder
-- Single executable, no dependencies
-- No Python required
-- Create `dist/README.txt` with usage instructions
+**Option 2: Binary Distribution (Recommended)**
+- Share just `dist/excel-flattener` (or `.exe`)
+- **Requirements**: None (standalone)
+- **Pros**: No Python needed, single file
+- **Cons**: Platform-specific, large file size
+
+Create a simple README for users:
+```bash
+cat > dist/README.txt << EOF
+Excel Flattener - Standalone Executable
+
+Usage:
+  ./excel-flattener flatten workbook.xlsx
+  ./excel-flattener --help
+
+Configuration:
+  Create a .env file in the same directory:
+    FLATTENER_OUTPUT_DIR=./output
+    FLATTENER_LOG_LEVEL=DEBUG
+
+  Or use environment variables:
+    export FLATTENER_OUTPUT_DIR=./output
+    ./excel-flattener flatten workbook.xlsx
+EOF
+```
 
 **Option 3: PyPI Package (Future)**
 ```bash
 pip install excel-flattener
 excel-flattener flatten workbook.xlsx
 ```
+
+### PyInstaller Configuration Details
+
+**Why `--onefile`?**
+- Creates single executable (easier distribution)
+- Extracts to temp on first run (~2-3 second startup delay)
+- Alternative: `--onedir` (faster startup, but many files)
+
+**Why all the `--hidden-import`?**
+- PyInstaller analyses imports statically
+- Dynamic imports (e.g., `importlib.import_module()`) are missed
+- openpyxl uses dynamic imports internally
+- Better to over-specify than have runtime errors
+
+**Why `--collect-data openpyxl`?**
+- openpyxl includes data files (XML schemas, etc.)
+- These aren't Python code, so must be explicitly bundled
+
+**Spec file:**
+After first build, PyInstaller creates `excel-flattener.spec`. You can:
+1. Edit this file for advanced customization
+2. Rebuild with: `pyinstaller excel-flattener.spec`
+3. Version control it for reproducible builds
 
 ---
 
