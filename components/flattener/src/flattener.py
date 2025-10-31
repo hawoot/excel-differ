@@ -306,11 +306,18 @@ class Flattener:
                 sheet_dir = sheets_dir / safe_name
                 sheet_dir.mkdir(exist_ok=True)
 
-                # Extract formulas - ALWAYS create file
+                # Extract formulas - ALWAYS create TWO files (row-order and column-order)
                 formulas = extractor.extract_formulas()
-                formulas_path = sheet_dir / 'formulas.txt'
-                write_formulas_file(sheet_name, formulas, formulas_path)
-                manifest.add_file(formulas_path, flat_root)
+
+                # Row-by-row order (A1, A2, A3, B1, B2, B3...) - useful for row patterns
+                formulas_row_path = sheet_dir / 'formulas-by-row.txt'
+                write_formulas_file(sheet_name, formulas, formulas_row_path, sort_order='row')
+                manifest.add_file(formulas_row_path, flat_root)
+
+                # Column-by-column order (A1, B1, C1, A2, B2, C2...) - useful for column patterns
+                formulas_col_path = sheet_dir / 'formulas-by-column.txt'
+                write_formulas_file(sheet_name, formulas, formulas_col_path, sort_order='column')
+                manifest.add_file(formulas_col_path, flat_root)
 
                 # Extract literal values - create file if enabled (default: True)
                 if self.include_literal:

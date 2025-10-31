@@ -299,7 +299,7 @@ class SheetExtractor:
         return format_info if format_info else None
 
 
-def write_formulas_file(sheet_name: str, formulas: List[Dict[str, str]], output_path: Path) -> None:
+def write_formulas_file(sheet_name: str, formulas: List[Dict[str, str]], output_path: Path, sort_order: str = 'row') -> None:
     """
     Write formulas to text file.
 
@@ -309,18 +309,30 @@ def write_formulas_file(sheet_name: str, formulas: List[Dict[str, str]], output_
         sheet_name: Name of sheet
         formulas: List of formula dictionaries
         output_path: Path to output file
+        sort_order: 'row' for row-major (A1,A2,A3,B1...) or 'column' for column-major (A1,B1,C1,A2...)
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+    # Apply appropriate sorting
+    if sort_order == 'column':
+        from .normalizer import sort_columns_by_address
+        sorted_formulas = sort_columns_by_address(formulas)
+        order_desc = 'column-by-column (A1, B1, C1, A2, B2, C2...)'
+    else:
+        # formulas are already sorted by row-major order from extract_formulas()
+        sorted_formulas = formulas
+        order_desc = 'row-by-row (A1, A2, A3, B1, B2, B3...)'
+
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(f'# Formulas: {sheet_name}\n')
+        f.write(f'# Order: {order_desc}\n')
         f.write('# ' + '=' * 50 + '\n\n')
 
-        for item in formulas:
+        for item in sorted_formulas:
             formula = normalise_line_endings(item['formula'])
             f.write(f"{item['address']}: {formula}\n")
 
-    logger.debug(f"Wrote formulas to: {output_path}")
+    logger.debug(f"Wrote formulas ({sort_order}-order) to: {output_path}")
 
 
 def write_values_file(sheet_name: str, values: List[Dict[str, str]], output_path: Path, file_type: str = 'literal') -> None:

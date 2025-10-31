@@ -297,7 +297,7 @@ def normalise_sheet_name(name: str) -> str:
 
 def sort_rows_by_address(rows: list) -> list:
     """
-    Sort rows by cell address in row-major order.
+    Sort rows by cell address in row-major order (A1, A2, A3, B1, B2, B3...).
 
     Each row should be a dictionary with 'address' key.
 
@@ -305,8 +305,29 @@ def sort_rows_by_address(rows: list) -> list:
         rows: List of dictionaries with 'address' key
 
     Returns:
-        Sorted list
+        Sorted list (row-major order)
     """
     from .utils import sort_key_for_cell_address
 
     return sorted(rows, key=lambda x: sort_key_for_cell_address(x['address']))
+
+
+def sort_columns_by_address(rows: list) -> list:
+    """
+    Sort rows by cell address in column-major order (A1, B1, C1, A2, B2, C2...).
+
+    Each row should be a dictionary with 'address' key.
+
+    Args:
+        rows: List of dictionaries with 'address' key
+
+    Returns:
+        Sorted list (column-major order)
+    """
+    from .utils import sort_key_for_cell_address
+
+    # Sort by (col, row) instead of (row, col)
+    return sorted(rows, key=lambda x: (
+        sort_key_for_cell_address(x['address'])[1],  # column first
+        sort_key_for_cell_address(x['address'])[0]   # then row
+    ))
