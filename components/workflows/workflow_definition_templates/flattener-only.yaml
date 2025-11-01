@@ -1,5 +1,4 @@
-# Excel Differ Configuration Example
-# Scenario: Flattener-Only Workflow (No Conversion)
+# Excel Differ Workflow: Flattener-Only (No Conversion)
 # Use case: Only flatten Excel files, no format conversion needed
 
 source:

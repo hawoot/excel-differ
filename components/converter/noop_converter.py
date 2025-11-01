@@ -5,7 +5,7 @@ NoOp Converter - Explicit no-conversion implementation
 from pathlib import Path
 from typing import Optional
 
-from components.core.interfaces import ConverterInterface, ConversionResult
+from components.interfaces import ConverterInterface, ConversionResult
 
 
 class NoOpConverter(ConverterInterface):

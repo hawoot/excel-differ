@@ -1,20 +1,17 @@
-# Excel Differ Configuration Example
-# Scenario: Bitbucket Source → Bitbucket Destination (same repo)
-# Use case: Automated flattening within same repository
+# Excel Differ Workflow: Local Folder → Bitbucket
+# Use case: Process Excel files from local folder, upload flattened outputs to Bitbucket
 
 source:
-  implementation: bitbucket
+  implementation: local_folder
   config:
-    url: https://bitbucket.org/myworkspace/my-repo
-    branch: main
-    token: ${BITBUCKET_TOKEN}
+    folder_path: /path/to/excel/files
     include_patterns:
-      - "data/**/*.xlsx"
-      - "reports/**/*.xlsm"
+      - "**/*.xlsx"
+      - "**/*.xlsm"
     exclude_patterns:
+      - "**/~$*"          # Excel temp files
+      - "**/.~lock.*"     # LibreOffice lock files
       - "**/archive/**"
-      - "**/temp/**"
-    depth: 1  # Only process latest commit if no sync state
 
 destination:
   implementation: bitbucket

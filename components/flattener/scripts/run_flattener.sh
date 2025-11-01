@@ -84,6 +84,8 @@ fi
 #   ./scripts/run_flattener.sh flatten ./snippets/sample.xlsx --no-computed --no-formats --no-literal
 # Default options:
 #   ./scripts/run_flattener.sh flatten ./snippets/sample.xlsx --no-computed --include-literal --include-formats
+# Maximum options:
+#   ./scripts/run_flattener.sh flatten ./snippets/sample.xlsx --include-computed --include-literal --include-formats
 
 # Debugging options:
 #   ./scripts/run_flattener.sh flatten ./snippets/sample.xlsx -o ./output --log-level DEBUG

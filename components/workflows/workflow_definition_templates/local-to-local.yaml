@@ -1,0 +1,29 @@
+# Excel Differ Workflow: Local Folder → Local Folder
+# Use case: Process Excel files from one local folder, output to another
+
+source:
+  implementation: local_folder
+  config:
+    folder_path: /path/to/excel/files
+    include_patterns:
+      - "**/*.xlsx"
+      - "**/*.xlsm"
+    exclude_patterns:
+      - "**/~$*"          # Excel temp files
+      - "**/.~lock.*"     # LibreOffice lock files
+
+destination:
+  implementation: local_folder
+  config:
+    folder_path: /path/to/output
+
+converter:
+  implementation: noop
+  config: {}
+
+flattener:
+  implementation: openpyxl
+  config:
+    include_computed: false
+    include_literal: true
+    include_formats: true

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional
 import shutil
 
-from components.core.interfaces import FlattenerInterface, FlattenResult
+from components.interfaces import FlattenerInterface, FlattenResult
 
 
 class NoOpFlattener(FlattenerInterface):

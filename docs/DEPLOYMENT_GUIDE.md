@@ -1,121 +1,367 @@
 # Excel Differ - Deployment Guide
 
-**Version:** 3.0
 **Last Updated:** 2025-11-01
-**Status:** Phase 2 Design
 
 ---
 
-## Overview
+## Table of Contents
 
-This guide explains exactly how to deploy and run Excel Differ in different scenarios. It covers both **source code** deployment (run with Python) and **standalone executable** deployment (when available).
+1. [What is Excel Differ?](#what-is-excel-differ)
+2. [Understanding Workflows](#understanding-workflows)
+3. [Installation](#installation)
+4. [Creating Your Workflow](#creating-your-workflow)
+5. [Available Components](#available-components)
+6. [Running Excel Differ](#running-excel-differ)
+7. [Common Workflow Examples](#common-workflow-examples)
+   - [Example 1: Local Development](#example-1-local-development)
+   - [Example 2: Bitbucket to Local](#example-2-bitbucket-to-local)
+   - [Example 3: Full Cloud Workflow](#example-3-full-cloud-workflow)
+   - [Example 4: Converter-Only Workflow](#example-4-converter-only-workflow)
+8. [Authentication Setup](#authentication-setup)
+9. [Configuration Reference](#configuration-reference)
+10. [Troubleshooting](#troubleshooting)
+11. [Advanced Topics](#advanced-topics)
+12. [Security Best Practices](#security-best-practices)
 
 ---
 
-## Deployment Options
+## What is Excel Differ?
 
-### Option 1: Run from Source Code
-**Best for:** Development, customisation, debugging
+Excel Differ automates the process of:
+1. Getting Excel files from a source (Bitbucket, local folder)
+2. Converting files if needed (.xlsb → .xlsm)
+3. Flattening Excel files to text representations
+4. Uploading flattened results to a destination (Bitbucket, local folder)
 
-### Option 2: Standalone Executable (Future)
-**Best for:** Production, CI/CD, distribution to non-technical users
+This makes Excel files version-control friendly and enables meaningful diffs.
 
 ---
 
-## Option 1: Run from Source Code
+## Understanding Workflows
 
-### Minimum File Structure
+Excel Differ is configured using **workflow definitions** - YAML files that describe your complete processing pipeline.
 
+### What is a Workflow Definition?
+
+A workflow definition tells Excel Differ exactly how to process your files:
+- **Source**: Where to get Excel files
+- **Destination**: Where to upload flattened results
+- **Converter**: Whether/how to convert files
+- **Flattener**: How to flatten Excel files
+
+### Workflow File Structure
+
+Every workflow YAML file has four required sections:
+
+```yaml
+source:
+  implementation: <type>
+  config:
+    <settings>
+
+destination:
+  implementation: <type>
+  config:
+    <settings>
+
+converter:
+  implementation: <type>
+  config:
+    <settings>
+
+flattener:
+  implementation: <type>
+  config:
+    <settings>
 ```
-your-deployment-location/
-├── excel-differ/                    # Git repository clone
-│   ├── components/
-│   │   ├── core/                    # Core interfaces (Phase 2)
-│   │   ├── flattener/              # ✅ Available now
-│   │   ├── source/                 # Source components (Phase 2)
-│   │   ├── destination/            # Destination components (Phase 2)
-│   │   ├── converter/              # Converter components (Phase 2+)
-│   │   └── orchestrator/           # Orchestrator (Phase 2)
-│   ├── config/                      # YOUR configuration files go here
-│   │   └── excel-differ.yaml       # Main config file
-│   ├── docs/
-│   ├── main.py                      # Main entry point (Phase 2)
-│   └── requirements.txt
-│
-├── .env                             # YOUR secrets (tokens)
-└── venv/                            # Python virtual environment (created)
+
+### Example: Simple Local Workflow
+
+```yaml
+# my-workflow.yaml
+source:
+  implementation: local_folder
+  config:
+    folder_path: /data/excel
+    include_patterns:
+      - "**/*.xlsx"
+
+destination:
+  implementation: local_folder
+  config:
+    folder_path: /output
+
+converter:
+  implementation: noop
+  config: {}
+
+flattener:
+  implementation: openpyxl
+  config:
+    include_computed: false
 ```
 
-### Step-by-Step Setup
+---
 
-#### 1. Clone Repository
+## Installation
+
+### Prerequisites
+
+- Python 3.9 or higher
+- pip (Python package manager)
+- Git (for cloning the repository)
+
+### Step 1: Clone Repository
 
 ```bash
-cd /path/where/you/want/excel-differ
+cd /where/you/want/excel-differ
 git clone <repository-url> excel-differ
 cd excel-differ
 ```
 
-#### 2. Create Virtual Environment
+### Step 2: Create Virtual Environment
 
 ```bash
 # Create virtual environment
 python3 -m venv venv
 
-# Activate it (Linux/Mac)
-source venv/bin/activate
-
-# Activate it (Windows)
-venv\Scripts\activate
+# Activate it
+source venv/bin/activate        # Linux/Mac
+# OR
+venv\Scripts\activate           # Windows
 ```
 
-#### 3. Install Dependencies
+### Step 3: Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-#### 4. Create Configuration Files
+---
 
-**Create `.env` in repository root:**
-```bash
-# .env - Store your secrets here
-BITBUCKET_TOKEN=your_bitbucket_app_password_here
+## Creating Your Workflow
+
+### Step 1: Choose a Template
+
+Excel Differ provides templates for common scenarios:
+
+```
+components/workflows/workflow_definition_templates/
+├── local-to-local.yaml           # Local folder → Local folder
+├── local-to-bitbucket.yaml       # Local folder → Bitbucket
+├── bitbucket-to-local.yaml       # Bitbucket → Local folder
+├── bitbucket-to-bitbucket.yaml   # Bitbucket → Bitbucket (same repo)
+├── converter-only.yaml           # Only conversion, no flattening
+└── flattener-only.yaml           # Only flattening, no conversion
 ```
 
-**Create `config/excel-differ.yaml`:**
-```yaml
-# config/excel-differ.yaml
+### Step 2: Copy and Customize
 
-# Source - where to get Excel files
+```bash
+# Copy a template
+cp components/workflows/workflow_definition_templates/local-to-local.yaml my-workflow.yaml
+
+# Edit it
+nano my-workflow.yaml
+```
+
+### Step 3: Set Up Environment Variables
+
+If your workflow uses secrets (e.g., Bitbucket tokens), create a `.env` file:
+
+```bash
+# .env
+BITBUCKET_TOKEN=your_app_password_here
+```
+
+Your workflow YAML references these with `${VAR}` syntax:
+
+```yaml
+source:
+  config:
+    token: ${BITBUCKET_TOKEN}  # Resolved automatically
+```
+
+---
+
+## Available Components
+
+### Source Implementations
+
+| Implementation | Description | Config Keys |
+|---------------|-------------|-------------|
+| `local_folder` | Read from local directory | `folder_path`, `include_patterns`, `exclude_patterns` |
+| `bitbucket` | Read from Bitbucket repository | `url`, `branch`, `token`, `include_patterns`, `depth` |
+
+### Destination Implementations
+
+| Implementation | Description | Config Keys |
+|---------------|-------------|-------------|
+| `local_folder` | Write to local directory | `folder_path` |
+| `bitbucket` | Write to Bitbucket repository | `url`, `branch`, `token`, `output_path` |
+
+### Converter Implementations
+
+| Implementation | Description | Config Keys |
+|---------------|-------------|-------------|
+| `noop` | No conversion (most common) | None |
+| `windows_excel` | Convert using Windows Excel | `timeout` |
+
+### Flattener Implementations
+
+| Implementation | Description | Config Keys |
+|---------------|-------------|-------------|
+| `openpyxl` | Full Excel flattening | `include_computed`, `include_literal`, `include_formats`, `timeout` |
+| `noop` | No flattening (converter-only workflows) | None |
+
+---
+
+## Running Excel Differ
+
+### Command Line
+
+```bash
+# With explicit workflow path
+python main.py --workflow my-workflow.yaml
+
+# With environment variable
+export EXCEL_DIFFER_WORKFLOW=my-workflow.yaml
+python main.py
+```
+
+### From Python
+
+```python
+from pathlib import Path
+from components.workflows.workflow_loader import load_workflow
+from components.component_registry import registry
+
+# Load workflow
+workflow = load_workflow(Path('my-workflow.yaml'))
+
+# Create component instances
+source = registry.create_source(
+    workflow.source.implementation,
+    workflow.source.config
+)
+# ... create other components and run orchestrator
+```
+
+---
+
+## Common Workflow Examples
+
+### Example 1: Local Development
+
+**Scenario**: Process Excel files from local folder, output to another local folder
+
+```yaml
+# local-dev.yaml
+source:
+  implementation: local_folder
+  config:
+    folder_path: /Users/me/Documents/excel-files
+    include_patterns:
+      - "**/*.xlsx"
+      - "**/*.xlsm"
+    exclude_patterns:
+      - "**/~$*"  # Temporary files
+
+destination:
+  implementation: local_folder
+  config:
+    folder_path: /Users/me/Documents/flattened-output
+
+converter:
+  implementation: noop
+  config: {}
+
+flattener:
+  implementation: openpyxl
+  config:
+    include_computed: false
+    include_literal: true
+    include_formats: true
+```
+
+**Run it**:
+```bash
+python main.py --workflow local-dev.yaml
+```
+
+---
+
+### Example 2: Bitbucket to Local
+
+**Scenario**: Pull Excel files from Bitbucket, save flattened outputs locally
+
+```yaml
+# bitbucket-to-local.yaml
 source:
   implementation: bitbucket
   config:
-    url: https://bitbucket.org/myworkspace/my-excel-repo
+    url: https://bitbucket.org/myworkspace/excel-repo
     branch: main
     token: ${BITBUCKET_TOKEN}
     include_patterns:
       - "data/**/*.xlsx"
-      - "reports/**/*.xlsm"
+    depth: 1  # Only process latest commit
+
+destination:
+  implementation: local_folder
+  config:
+    folder_path: /output/flattened
+
+converter:
+  implementation: noop
+  config: {}
+
+flattener:
+  implementation: openpyxl
+  config:
+    include_computed: false
+    include_literal: true
+    include_formats: true
+```
+
+**Setup**:
+```bash
+# Create .env file
+echo "BITBUCKET_TOKEN=your_app_password" > .env
+
+# Run
+python main.py --workflow bitbucket-to-local.yaml
+```
+
+---
+
+### Example 3: Full Cloud Workflow
+
+**Scenario**: Automated processing within Bitbucket repository
+
+```yaml
+# cloud-workflow.yaml
+source:
+  implementation: bitbucket
+  config:
+    url: https://bitbucket.org/myworkspace/my-repo
+    branch: main
+    token: ${BITBUCKET_TOKEN}
+    include_patterns:
+      - "reports/**/*.xlsx"
+      - "data/**/*.xlsm"
     exclude_patterns:
       - "**/archive/**"
-      - "**/temp/**"
     depth: 1
 
-# Destination - where to upload flattened outputs
 destination:
   implementation: bitbucket
   config:
-    url: https://bitbucket.org/myworkspace/my-excel-repo
+    url: https://bitbucket.org/myworkspace/my-repo
     branch: main
     token: ${BITBUCKET_TOKEN}
     output_path: flattened/
 
-# Sync behaviour
-sync:
-  depth: 1
-
-# Components
 converter:
   implementation: noop
   config: {}
@@ -127,338 +373,51 @@ flattener:
     include_literal: true
     include_formats: true
     timeout: 900
-
-git:
-  implementation: bitbucket
-  config: {}
 ```
 
-#### 5. Run Excel Differ
-
-**Phase 1 (Current) - Flattener Only:**
+**Setup**:
 ```bash
-# Flatten a single file
-python -m components.flattener.src flatten myfile.xlsx --output ./flats
+# .env
+BITBUCKET_TOKEN=your_app_password
 
-# Show flattener info
-python -m components.flattener.src info myfile.xlsx
-```
-
-**Phase 2 (Coming Soon) - Full Orchestrator:**
-```bash
-# Run orchestrator with config
-python main.py --config config/excel-differ.yaml
-
-# Or with environment variables
-export EXCEL_DIFFER_CONFIG=config/excel-differ.yaml
-python main.py
+# Run
+python main.py --workflow cloud-workflow.yaml
 ```
 
 ---
 
-## Option 2: Standalone Executable (Future - Phase 2+)
+### Example 4: Converter-Only Workflow
 
-### Minimum File Structure
-
-```
-your-deployment-location/
-├── excel-differ                     # Standalone executable (or excel-differ.exe on Windows)
-├── config/
-│   └── excel-differ.yaml           # YOUR configuration file
-└── .env                             # YOUR secrets
-```
-
-### Step-by-Step Setup
-
-#### 1. Download Executable
-
-```bash
-# Download from releases page
-curl -L https://github.com/org/excel-differ/releases/latest/download/excel-differ-linux -o excel-differ
-chmod +x excel-differ
-
-# Windows
-# Download excel-differ.exe from releases page
-```
-
-#### 2. Create Configuration Files
-
-Same as Option 1 (`.env` and `config/excel-differ.yaml`)
-
-#### 3. Run Excel Differ
-
-```bash
-# Run with config file
-./excel-differ --config config/excel-differ.yaml
-
-# Run with environment variable
-export EXCEL_DIFFER_CONFIG=config/excel-differ.yaml
-./excel-differ
-
-# Windows
-excel-differ.exe --config config\excel-differ.yaml
-```
-
----
-
-## Configuration File Reference
-
-### Minimal Configuration (Same Repo, Both Source and Destination)
+**Scenario**: Convert .xlsb files to .xlsm, no flattening
 
 ```yaml
+# converter-only.yaml
 source:
   implementation: bitbucket
   config:
-    url: https://bitbucket.org/workspace/repo
+    url: https://bitbucket.org/myworkspace/binary-files
     branch: main
     token: ${BITBUCKET_TOKEN}
     include_patterns:
-      - "**/*.xlsx"
-      - "**/*.xlsm"
-
-destination:
-  implementation: bitbucket
-  config:
-    url: https://bitbucket.org/workspace/repo
-    branch: main
-    token: ${BITBUCKET_TOKEN}
-    output_path: flattened/
-
-sync:
-  depth: 1
-
-converter:
-  implementation: noop
-
-flattener:
-  implementation: openpyxl
-  config:
-    include_computed: false
-```
-
-### Separate Repositories
-
-```yaml
-source:
-  implementation: bitbucket
-  config:
-    url: https://bitbucket.org/workspace/excel-files
-    branch: main
-    token: ${BITBUCKET_SOURCE_TOKEN}
-    include_patterns:
-      - "**/*.xlsx"
-
-destination:
-  implementation: bitbucket
-  config:
-    url: https://bitbucket.org/workspace/excel-flattened
-    branch: main
-    token: ${BITBUCKET_DEST_TOKEN}
-    output_path: /
-
-sync:
-  depth: 1
-
-converter:
-  implementation: noop
-
-flattener:
-  implementation: openpyxl
-```
-
-### Local Source, Bitbucket Destination
-
-```yaml
-source:
-  implementation: local_folder
-  config:
-    folder_path: /path/to/excel/files
-    include_patterns:
-      - "**/*.xlsx"
-    exclude_patterns:
-      - "**/~$*"
-
-destination:
-  implementation: bitbucket
-  config:
-    url: https://bitbucket.org/workspace/repo
-    branch: main
-    token: ${BITBUCKET_TOKEN}
-    output_path: flattened/
-
-sync:
-  depth: 0  # Local folder mode
-
-converter:
-  implementation: noop
-
-flattener:
-  implementation: openpyxl
-```
-
-### Bitbucket Source, Local Destination
-
-```yaml
-source:
-  implementation: bitbucket
-  config:
-    url: https://bitbucket.org/workspace/repo
-    branch: main
-    token: ${BITBUCKET_TOKEN}
-    include_patterns:
-      - "**/*.xlsx"
+      - "**/*.xlsb"  # Only binary files
     depth: 1
 
 destination:
-  implementation: local_folder
+  implementation: bitbucket
   config:
-    folder_path: /output/flattened
-
-sync:
-  depth: 1
+    url: https://bitbucket.org/myworkspace/converted-files
+    branch: main
+    token: ${BITBUCKET_TOKEN}
+    output_path: converted/
 
 converter:
-  implementation: noop
+  implementation: windows_excel
+  config:
+    timeout: 300
 
 flattener:
-  implementation: openpyxl
-```
-
----
-
-## Where to Put Configuration Files
-
-### Recommended Location (Production)
-
-```
-/etc/excel-differ/
-├── config/
-│   └── excel-differ.yaml
-└── .env
-
-# Run with
-excel-differ --config /etc/excel-differ/config/excel-differ.yaml
-```
-
-### Alternative: User Home Directory
-
-```
-~/.excel-differ/
-├── config/
-│   └── excel-differ.yaml
-└── .env
-
-# Run with
-excel-differ --config ~/.excel-differ/config/excel-differ.yaml
-```
-
-### Alternative: Project Directory
-
-```
-/projects/excel-processing/
-├── excel-differ/           # Executable or source
-├── config/
-│   └── excel-differ.yaml
-└── .env
-
-# Run with
-cd /projects/excel-processing
-excel-differ --config config/excel-differ.yaml
-```
-
-### Environment Variable (Recommended for CI/CD)
-
-```bash
-export EXCEL_DIFFER_CONFIG=/path/to/config/excel-differ.yaml
-excel-differ
-```
-
----
-
-## Running in Different Environments
-
-### Local Development
-
-```bash
-# From source
-cd /path/to/excel-differ
-source venv/bin/activate
-python main.py --config config/excel-differ.yaml
-```
-
-### CI/CD (GitHub Actions Example)
-
-```yaml
-name: Flatten Excel Files
-on:
-  push:
-    branches: [main]
-
-jobs:
-  flatten:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Install Excel Differ
-        run: |
-          pip install -r requirements.txt
-
-      - name: Create config
-        run: |
-          mkdir -p config
-          cat > config/excel-differ.yaml <<EOF
-          source:
-            implementation: bitbucket
-            config:
-              url: https://bitbucket.org/${{ github.repository }}
-              branch: main
-              token: \${{ secrets.BITBUCKET_TOKEN }}
-              include_patterns:
-                - "**/*.xlsx"
-          destination:
-            implementation: bitbucket
-            config:
-              url: https://bitbucket.org/${{ github.repository }}
-              branch: main
-              token: \${{ secrets.BITBUCKET_TOKEN }}
-              output_path: flattened/
-          sync:
-            depth: 1
-          converter:
-            implementation: noop
-          flattener:
-            implementation: openpyxl
-          EOF
-
-      - name: Run Excel Differ
-        env:
-          BITBUCKET_TOKEN: ${{ secrets.BITBUCKET_TOKEN }}
-        run: |
-          python main.py --config config/excel-differ.yaml
-```
-
-### Cron Job (Linux)
-
-```bash
-# Add to crontab: crontab -e
-
-# Run every day at 2am
-0 2 * * * cd /path/to/excel-differ && source venv/bin/activate && python main.py --config config/excel-differ.yaml >> /var/log/excel-differ.log 2>&1
-```
-
-### Windows Scheduled Task
-
-```powershell
-# Create scheduled task
-$action = New-ScheduledTaskAction -Execute 'C:\path\to\excel-differ.exe' -Argument '--config C:\path\to\config\excel-differ.yaml'
-$trigger = New-ScheduledTaskTrigger -Daily -At 2am
-Register-ScheduledTask -Action $action -Trigger $trigger -TaskName "Excel Differ Daily"
+  implementation: noop  # No flattening
+  config: {}
 ```
 
 ---
@@ -472,23 +431,24 @@ Register-ScheduledTask -Action $action -Trigger $trigger -TaskName "Excel Differ
 3. Name: `excel-differ`
 4. Permissions needed:
    - **Repositories:** Read, Write
-   - **Pull requests:** Read (optional)
 5. Copy the generated password
 6. Add to `.env`:
-   ```
-   BITBUCKET_TOKEN=your_app_password_here
+   ```bash
+   BITBUCKET_TOKEN=your_generated_password
    ```
 
-### Multiple Repositories (Different Tokens)
+### Multiple Repositories
+
+If you use different repos for source and destination:
 
 ```bash
 # .env
 BITBUCKET_SOURCE_TOKEN=token_for_source_repo
-BITBUCKET_DEST_TOKEN=token_for_dest_repo
+BITBUCKET_DEST_TOKEN=token_for_destination_repo
 ```
 
 ```yaml
-# config/excel-differ.yaml
+# workflow.yaml
 source:
   config:
     token: ${BITBUCKET_SOURCE_TOKEN}
@@ -500,196 +460,244 @@ destination:
 
 ---
 
-## Troubleshooting
+## Configuration Reference
 
-### Issue: "Environment variable not set"
-
-**Cause:** `.env` file not found or not loaded
-
-**Solution:**
-```bash
-# Make sure .env is in the same directory as excel-differ
-ls -la .env
-
-# Or specify explicitly
-export BITBUCKET_TOKEN=your_token
-```
-
-### Issue: "Cannot connect to repository"
-
-**Cause:** Invalid token or URL
-
-**Solution:**
-```bash
-# Test token manually
-curl -u username:token https://api.bitbucket.org/2.0/user
-
-# Verify URL format
-# Correct: https://bitbucket.org/workspace/repo
-# Wrong: https://bitbucket.org/workspace/repo.git
-```
-
-### Issue: "No files found to process"
-
-**Cause:** Patterns don't match any files, or all files already processed
-
-**Solution:**
-```yaml
-# Check patterns are correct
-include_patterns:
-  - "**/*.xlsx"  # Recursive
-  - "*.xlsx"     # Only root directory
-
-# Verify depth setting
-sync:
-  depth: 1  # Only last commit
-```
-
-### Issue: "Permission denied"
-
-**Cause:** Missing write permissions on destination
-
-**Solution:**
-- Verify token has write permissions
-- Check repository settings allow pushes
-- Verify branch is not protected
-
----
-
-## Performance Considerations
-
-### Large Repositories
-
-If source repository has many Excel files:
+### Source: local_folder
 
 ```yaml
 source:
+  implementation: local_folder
   config:
-    include_patterns:
-      - "reports/2024/**/*.xlsx"  # Narrow scope
-    exclude_patterns:
-      - "**/archive/**"           # Exclude old files
-    depth: 1                       # Only recent changes
+    folder_path: /absolute/path/to/folder  # Required
+    include_patterns:                      # Optional
+      - "**/*.xlsx"
+      - "**/*.xlsm"
+    exclude_patterns:                      # Optional
+      - "**/~$*"
+      - "**/archive/**"
 ```
 
-### Large Files
+### Source: bitbucket
 
-If Excel files are very large (>50MB):
+```yaml
+source:
+  implementation: bitbucket
+  config:
+    url: https://bitbucket.org/workspace/repo  # Required
+    branch: main                                # Required
+    token: ${BITBUCKET_TOKEN}                   # Required
+    include_patterns:                           # Optional
+      - "**/*.xlsx"
+    exclude_patterns:                           # Optional
+      - "**/temp/**"
+    depth: 1                                    # Optional (default: 1)
+    # depth = 0: process nothing
+    # depth = 1: process latest commit only
+    # depth = N: process last N commits
+```
+
+### Destination: local_folder
+
+```yaml
+destination:
+  implementation: local_folder
+  config:
+    folder_path: /absolute/path/to/output  # Required
+```
+
+### Destination: bitbucket
+
+```yaml
+destination:
+  implementation: bitbucket
+  config:
+    url: https://bitbucket.org/workspace/repo  # Required
+    branch: main                                # Required
+    token: ${BITBUCKET_TOKEN}                   # Required
+    output_path: flattened/                     # Optional (default: /)
+```
+
+### Converter: noop
+
+```yaml
+converter:
+  implementation: noop
+  config: {}  # No configuration needed
+```
+
+### Converter: windows_excel
+
+```yaml
+converter:
+  implementation: windows_excel
+  config:
+    timeout: 300  # Optional (seconds, default: 300)
+```
+
+### Flattener: openpyxl
 
 ```yaml
 flattener:
+  implementation: openpyxl
   config:
-    timeout: 1800  # Increase timeout to 30 minutes
+    include_computed: false  # Optional (default: false)
+    include_literal: true    # Optional (default: true)
+    include_formats: true    # Optional (default: true)
+    timeout: 900            # Optional (seconds, default: 900)
 ```
 
-### API Rate Limits
+### Flattener: noop
 
-If hitting Bitbucket API rate limits:
+```yaml
+flattener:
+  implementation: noop
+  config: {}  # No configuration needed
+```
 
-- Use `depth: 1` to minimize API calls
-- Consider switching to local git implementation (GitPython)
-- Add delays between operations (future feature)
+---
+
+## Troubleshooting
+
+### Issue: "Workflow file not found"
+
+**Error**: `FileNotFoundError: Workflow file not found: my-workflow.yaml`
+
+**Solution**: Provide absolute path or ensure you're in the correct directory
+```bash
+python main.py --workflow /absolute/path/to/my-workflow.yaml
+```
+
+---
+
+### Issue: "Environment variable not set"
+
+**Error**: `ValueError: Environment variable BITBUCKET_TOKEN not set`
+
+**Solution**: Create `.env` file or set environment variable
+```bash
+# Option 1: Create .env file
+echo "BITBUCKET_TOKEN=your_token" > .env
+
+# Option 2: Export variable
+export BITBUCKET_TOKEN=your_token
+```
+
+---
+
+### Issue: "Unknown implementation"
+
+**Error**: `ValueError: Unknown source implementation 'my_custom'. Available: ['local_folder', 'bitbucket']`
+
+**Solution**: Use a registered implementation or register your custom one
+
+---
+
+### Issue: "Missing required section"
+
+**Error**: `ValueError: Missing required section 'flattener' in workflow file`
+
+**Solution**: Ensure all four sections are present (source, destination, converter, flattener)
+
+---
+
+## Advanced Topics
+
+### Custom Implementations
+
+You can add custom component implementations:
+
+1. Create your implementation:
+```python
+# components/source/my_custom/my_custom_source.py
+from components.interfaces import SourceInterface
+
+class MyCustomSource(SourceInterface):
+    # Implement required methods...
+    pass
+```
+
+2. Register it:
+```python
+# components/source/my_custom/__init__.py
+from components.component_registry import registry
+from .my_custom_source import MyCustomSource
+
+registry.register_source('my_custom', MyCustomSource)
+```
+
+3. Use in workflow:
+```yaml
+source:
+  implementation: my_custom
+  config:
+    custom_setting: value
+```
+
+---
+
+## Workflow Validation
+
+Before running, you can validate your workflow:
+
+```python
+from pathlib import Path
+from components.workflows.workflow_loader import load_workflow
+
+try:
+    workflow = load_workflow(Path('my-workflow.yaml'))
+    print(f"✓ Workflow valid")
+    print(f"  Source: {workflow.source.implementation}")
+    print(f"  Destination: {workflow.destination.implementation}")
+    print(f"  Converter: {workflow.converter.implementation}")
+    print(f"  Flattener: {workflow.flattener.implementation}")
+except Exception as e:
+    print(f"✗ Workflow invalid: {e}")
+```
 
 ---
 
 ## Security Best Practices
 
-### 1. Never Commit Secrets
+1. **Never commit `.env` file**
+   ```bash
+   echo ".env" >> .gitignore
+   ```
 
-```bash
-# Add to .gitignore
-echo ".env" >> .gitignore
-echo "config/excel-differ.yaml" >> .gitignore  # If it contains secrets
-```
+2. **Use environment variables for secrets**
+   ```yaml
+   # Good
+   token: ${BITBUCKET_TOKEN}
 
-### 2. Use Environment Variables
+   # Bad
+   token: "hardcoded_secret"
+   ```
 
-```yaml
-# Good
-token: ${BITBUCKET_TOKEN}
+3. **Restrict token permissions**
+   - Only grant minimum required permissions
+   - Use separate tokens for source and destination if possible
 
-# Bad
-token: "your_actual_token_here"
-```
-
-### 3. Restrict Token Permissions
-
-- Only grant minimum required permissions
-- Use separate tokens for source and destination
-- Rotate tokens regularly
-
-### 4. Protect Config Files
-
-```bash
-# Restrict permissions
-chmod 600 .env
-chmod 600 config/excel-differ.yaml
-```
-
----
-
-## Upgrade Guide
-
-### Upgrading from Source
-
-```bash
-cd /path/to/excel-differ
-
-# Pull latest changes
-git pull origin main
-
-# Update dependencies
-source venv/bin/activate
-pip install -r requirements.txt --upgrade
-
-# Check for config changes
-git diff config/excel-differ.yaml.example
-
-# Run
-python main.py --config config/excel-differ.yaml
-```
-
-### Upgrading Standalone Executable
-
-```bash
-# Download new version
-curl -L https://github.com/org/excel-differ/releases/latest/download/excel-differ-linux -o excel-differ-new
-
-# Backup old version
-mv excel-differ excel-differ-old
-
-# Replace
-mv excel-differ-new excel-differ
-chmod +x excel-differ
-
-# Test
-./excel-differ --version
-
-# Clean up if successful
-rm excel-differ-old
-```
+4. **Protect configuration files**
+   ```bash
+   chmod 600 .env
+   chmod 600 my-workflow.yaml
+   ```
 
 ---
 
 ## Next Steps
 
-After deployment:
-
-1. **Verify Configuration:** Run with `--dry-run` (future feature) to verify config
-2. **Test Small Batch:** Start with `depth: 1` to process only recent changes
-3. **Monitor Logs:** Check output for warnings or errors
-4. **Review Results:** Verify flattened outputs are correct
-5. **Automate:** Set up cron job or CI/CD integration
-6. **Monitor:** Set up alerts for failures (future feature)
+1. **Choose a template** from `components/workflows/workflow_definition_templates/`
+2. **Customize it** for your needs
+3. **Set up authentication** (if using Bitbucket)
+4. **Run Excel Differ** with your workflow
+5. **Automate** with cron jobs or CI/CD
 
 ---
 
-## References
+## See Also
 
-- [PROJECT_PLAN.md](PROJECT_PLAN.md) - Current project status
-- [ARCHITECTURE_V3.md](ARCHITECTURE_V3.md) - System architecture
-- [COMPONENT_SPECIFICATIONS.md](COMPONENT_SPECIFICATIONS.md) - Component details
-
----
-
-**END OF DEPLOYMENT GUIDE**
+- [components/workflows/workflow_schema.py](../components/workflows/workflow_schema.py) - Workflow structure definition
+- [components/workflows/workflow_loader.py](../components/workflows/workflow_loader.py) - How workflows are loaded
+- [components/workflows/workflow_definition_templates/](../components/workflows/workflow_definition_templates/) - Example workflows
+- [COMPONENT_SPECIFICATIONS.md](COMPONENT_SPECIFICATIONS.md) - Full component interface specifications
+- [ARCHITECTURE_V3.md](ARCHITECTURE_V3.md) - System architecture overview

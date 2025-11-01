@@ -1,7 +1,82 @@
 """
 Excel Differ - Component Interfaces
 
-All abstract interfaces for pluggable components.
+WHAT THIS FILE DOES:
+    Defines the abstract interfaces (contracts) that all Excel Differ components
+    must implement. These are the "rules" for building plugins.
+
+RELATIONSHIP TO OTHER FILES:
+    - workflows/workflow_schema.py uses these interface names in WorkflowDefinition
+    - component_registry.py stores implementations of these interfaces
+    - Component implementations (source/*, destination/*, etc.) inherit from these
+    - workflows/workflow_loader.py doesn't directly use this (it creates config objects)
+
+THE FOUR CORE INTERFACES:
+    1. SourceInterface - Get Excel files from somewhere (Bitbucket, local folder)
+    2. DestinationInterface - Upload flattened results somewhere
+    3. ConverterInterface - Convert Excel files if needed (.xlsb → .xlsm)
+    4. FlattenerInterface - Flatten Excel files to text
+
+EXAMPLE USAGE:
+    # Implementing a new source
+    from components.interfaces import SourceInterface, SourceSyncState, SourceFileInfo
+
+    class MyCustomSource(SourceInterface):
+        def __init__(self, config: dict):
+            self.config = config
+
+        def get_sync_state(self) -> SourceSyncState:
+            # Read .excel-differ-state.json from destination
+            return SourceSyncState(
+                last_processed_version='abc123',
+                last_processed_date=datetime.now()
+            )
+
+        def get_changed_files(
+            self,
+            include_patterns: List[str],
+            exclude_patterns: List[str],
+            since_version: Optional[str],
+            depth: int
+        ) -> List[SourceFileInfo]:
+            # Find changed files matching patterns
+            return [SourceFileInfo(...)]
+
+        def download_file(self, source_path: str, version: str, local_dest: Path) -> DownloadResult:
+            # Download file to local destination
+            return DownloadResult(success=True, ...)
+
+        def get_current_version(self) -> str:
+            # Return current version identifier
+            return 'v2025-11-01'
+
+        def get_name(self) -> str:
+            return 'MyCustomSource'
+
+    # Register it
+    from components.component_registry import registry
+    registry.register_source('my_custom', MyCustomSource)
+
+    # Later: Use it in workflow YAML
+    # source:
+    #   implementation: my_custom
+    #   config:
+    #     custom_setting: value
+
+DATA CLASSES:
+    This file also defines data classes used by the interfaces:
+    - SourceFileInfo, SourceSyncState, DownloadResult (used by SourceInterface)
+    - UploadResult (used by DestinationInterface)
+    - ConversionResult (used by ConverterInterface)
+    - FlattenResult (used by FlattenerInterface)
+    - ProcessingResult, WorkflowResult (used by Orchestrator)
+
+SEE ALSO:
+    - docs/COMPONENT_SPECIFICATIONS.md - Full interface specifications
+    - components/source/ - Example source implementations
+    - components/destination/ - Example destination implementations
+    - components/converter/ - Example converter implementations
+    - components/flattener/ - Example flattener implementations
 """
 
 from abc import ABC, abstractmethod

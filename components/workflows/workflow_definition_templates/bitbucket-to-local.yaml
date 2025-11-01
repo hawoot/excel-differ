@@ -1,0 +1,31 @@
+# Excel Differ Workflow: Bitbucket → Local Folder
+# Use case: Pull Excel files from Bitbucket, save flattened outputs locally
+
+source:
+  implementation: bitbucket
+  config:
+    url: https://bitbucket.org/workspace/repo
+    branch: main
+    token: ${BITBUCKET_TOKEN}
+    include_patterns:
+      - "**/*.xlsx"
+      - "**/*.xlsm"
+    exclude_patterns:
+      - "**/archive/**"
+    depth: 1  # Process only latest commit
+
+destination:
+  implementation: local_folder
+  config:
+    folder_path: /path/to/output
+
+converter:
+  implementation: noop
+  config: {}
+
+flattener:
+  implementation: openpyxl
+  config:
+    include_computed: false
+    include_literal: true
+    include_formats: true

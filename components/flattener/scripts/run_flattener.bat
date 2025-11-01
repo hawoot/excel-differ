@@ -78,6 +78,8 @@ REM Minimal options:
 REM   scripts\run_flattener.bat flatten .\snippets\sample.xlsx --no-computed --no-formats --no-literal
 REM Default options:
 REM   scripts\run_flattener.bat flatten .\snippets\sample.xlsx --no-computed --include-literal --include-formats
+REM Maximum options:
+REM   scripts\run_flattener.bat flatten .\snippets\sample.xlsx --no-computed --include-literal --include-formats
 
 REM Debugging options:
 REM   scripts\run_flattener.bat flatten .\snippets\sample.xlsx -o ./output --log-level DEBUG

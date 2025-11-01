@@ -1,5 +1,4 @@
-# Excel Differ Configuration Example
-# Scenario: Converter-Only Workflow (No Flattening)
+# Excel Differ Workflow: Converter-Only (No Flattening)
 # Use case: Only convert .xlsb to .xlsm, no flattening
 # Result: Converted files are uploaded as-is
 
