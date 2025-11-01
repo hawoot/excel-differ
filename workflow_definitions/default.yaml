@@ -1,0 +1,37 @@
+# Excel Differ - Default Workflow Configuration
+#
+# This workflow is used when you run: python main.py workflow
+# (without specifying a config file)
+#
+# Default behavior: Process local Excel files and output to local folder
+
+source:
+  implementation: local_folder
+  config:
+    folder_path: ./input          # Input directory (create this folder)
+    include_patterns:
+      - "**/*.xlsx"                # Include all .xlsx files
+      - "**/*.xlsm"                # Include all .xlsm files
+    exclude_patterns:
+      - "**/~$*"                   # Exclude Excel temp files
+      - "**/.~lock.*"              # Exclude LibreOffice lock files
+      - "**/archive/**"            # Exclude archive folders
+      - "**/backup/**"             # Exclude backup folders
+
+destination:
+  implementation: local_folder
+  config:
+    folder_path: ./output         # Output directory (will be created)
+
+converter:
+  implementation: noop             # No conversion by default
+  config: {}
+
+flattener:
+  implementation: openpyxl         # Use openpyxl flattener
+  config:
+    include_computed: false        # Don't include computed values (formulas only)
+    include_literal: true          # Include literal values
+    include_formats: true          # Include cell formatting
+    timeout: 900                   # 15 minute timeout per file
+    max_file_size_mb: 200          # Max file size: 200 MB

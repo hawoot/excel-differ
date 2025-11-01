@@ -1,6 +1,7 @@
 # Excel Differ - Deployment Guide
 
 **Last Updated:** 2025-11-01
+**Version:** 4.0
 
 ---
 
@@ -146,7 +147,7 @@ pip install -r requirements.txt
 Excel Differ provides templates for common scenarios:
 
 ```
-components/workflows/workflow_definition_templates/
+workflow_definitions/templates/
 ├── local-to-local.yaml           # Local folder → Local folder
 ├── local-to-bitbucket.yaml       # Local folder → Bitbucket
 ├── bitbucket-to-local.yaml       # Bitbucket → Local folder
@@ -159,7 +160,7 @@ components/workflows/workflow_definition_templates/
 
 ```bash
 # Copy a template
-cp components/workflows/workflow_definition_templates/local-to-local.yaml my-workflow.yaml
+cp workflow_definitions/templates/local-to-local.yaml my-workflow.yaml
 
 # Edit it
 nano my-workflow.yaml
@@ -222,7 +223,7 @@ source:
 
 ```bash
 # With explicit workflow path
-python main.py --workflow my-workflow.yaml
+python main.py workflow my-workflow.yaml
 
 # With environment variable
 export EXCEL_DIFFER_WORKFLOW=my-workflow.yaml
@@ -233,8 +234,8 @@ python main.py
 
 ```python
 from pathlib import Path
-from components.workflows.workflow_loader import load_workflow
-from components.component_registry import registry
+from src.workflows.workflow_loader import load_workflow
+from src.component_registry import registry
 
 # Load workflow
 workflow = load_workflow(Path('my-workflow.yaml'))
@@ -286,7 +287,7 @@ flattener:
 
 **Run it**:
 ```bash
-python main.py --workflow local-dev.yaml
+python main.py workflow local-dev.yaml
 ```
 
 ---
@@ -330,7 +331,7 @@ flattener:
 echo "BITBUCKET_TOKEN=your_app_password" > .env
 
 # Run
-python main.py --workflow bitbucket-to-local.yaml
+python main.py workflow bitbucket-to-local.yaml
 ```
 
 ---
@@ -381,7 +382,7 @@ flattener:
 BITBUCKET_TOKEN=your_app_password
 
 # Run
-python main.py --workflow cloud-workflow.yaml
+python main.py workflow cloud-workflow.yaml
 ```
 
 ---
@@ -564,7 +565,7 @@ flattener:
 
 **Solution**: Provide absolute path or ensure you're in the correct directory
 ```bash
-python main.py --workflow /absolute/path/to/my-workflow.yaml
+python main.py workflow /absolute/path/to/my-workflow.yaml
 ```
 
 ---
@@ -609,7 +610,7 @@ You can add custom component implementations:
 1. Create your implementation:
 ```python
 # components/source/my_custom/my_custom_source.py
-from components.interfaces import SourceInterface
+from src.interfaces import SourceInterface
 
 class MyCustomSource(SourceInterface):
     # Implement required methods...
@@ -619,7 +620,7 @@ class MyCustomSource(SourceInterface):
 2. Register it:
 ```python
 # components/source/my_custom/__init__.py
-from components.component_registry import registry
+from src.component_registry import registry
 from .my_custom_source import MyCustomSource
 
 registry.register_source('my_custom', MyCustomSource)
@@ -641,7 +642,7 @@ Before running, you can validate your workflow:
 
 ```python
 from pathlib import Path
-from components.workflows.workflow_loader import load_workflow
+from src.workflows.workflow_loader import load_workflow
 
 try:
     workflow = load_workflow(Path('my-workflow.yaml'))
@@ -686,7 +687,7 @@ except Exception as e:
 
 ## Next Steps
 
-1. **Choose a template** from `components/workflows/workflow_definition_templates/`
+1. **Choose a template** from `workflow_definitions/templates/`
 2. **Customize it** for your needs
 3. **Set up authentication** (if using Bitbucket)
 4. **Run Excel Differ** with your workflow
@@ -698,6 +699,6 @@ except Exception as e:
 
 - [components/workflows/workflow_schema.py](../components/workflows/workflow_schema.py) - Workflow structure definition
 - [components/workflows/workflow_loader.py](../components/workflows/workflow_loader.py) - How workflows are loaded
-- [components/workflows/workflow_definition_templates/](../components/workflows/workflow_definition_templates/) - Example workflows
+- [workflow_definitions/templates/](../workflow_definitions/templates/) - Example workflows
 - [COMPONENT_SPECIFICATIONS.md](COMPONENT_SPECIFICATIONS.md) - Full component interface specifications
-- [ARCHITECTURE_V3.md](ARCHITECTURE_V3.md) - System architecture overview
+- [ARCHITECTURE_V4.md](ARCHITECTURE_V4.md) - System architecture overview

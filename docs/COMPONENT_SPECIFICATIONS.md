@@ -1,8 +1,10 @@
 # Excel Differ - Component Specifications
 
-**Version:** 3.0
+**Version:** 4.0
 **Last Updated:** 2025-11-01
 **Purpose:** Complete interface specifications for all components
+
+**Note:** This document describes the component interfaces. For V4 architecture overview, see [ARCHITECTURE_V4.md](ARCHITECTURE_V4.md).
 
 ---
 
@@ -1024,7 +1026,7 @@ def load_config(config_path: Path) -> ExcelDifferConfig:
 ### Step 1: Create Implementation Class
 
 ```python
-# components/source/my_new_source.py
+# src/components/source/my_new_source.py
 
 from components.core.interfaces import SourceInterface
 
@@ -1056,7 +1058,7 @@ class MyNewSource(SourceInterface):
 ### Step 2: Register in Plugin Registry
 
 ```python
-# components/core/plugin_registry.py
+# src/registry.py
 
 from components.source.my_new_source import MyNewSource
 
