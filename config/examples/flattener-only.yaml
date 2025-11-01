@@ -1,0 +1,36 @@
+# Excel Differ Configuration Example
+# Scenario: Flattener-Only Workflow (No Conversion)
+# Use case: Only flatten Excel files, no format conversion needed
+
+source:
+  implementation: bitbucket
+  config:
+    url: https://bitbucket.org/myworkspace/excel-files
+    branch: main
+    token: ${BITBUCKET_SOURCE_TOKEN}
+    include_patterns:
+      - "**/*.xlsx"
+      - "**/*.xlsm"
+    exclude_patterns:
+      - "**/archive/**"
+    depth: 1
+
+destination:
+  implementation: bitbucket
+  config:
+    url: https://bitbucket.org/myworkspace/excel-flattened
+    branch: main
+    token: ${BITBUCKET_DEST_TOKEN}
+    output_path: /
+
+converter:
+  implementation: noop  # No conversion
+  config: {}
+
+flattener:
+  implementation: openpyxl
+  config:
+    include_computed: false
+    include_literal: true
+    include_formats: true
+    timeout: 900

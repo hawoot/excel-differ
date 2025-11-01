@@ -1,0 +1,31 @@
+# Excel Differ Configuration Example
+# Scenario: Converter-Only Workflow (No Flattening)
+# Use case: Only convert .xlsb to .xlsm, no flattening
+# Result: Converted files are uploaded as-is
+
+source:
+  implementation: bitbucket
+  config:
+    url: https://bitbucket.org/myworkspace/excel-files
+    branch: main
+    token: ${BITBUCKET_TOKEN}
+    include_patterns:
+      - "**/*.xlsb"  # Only binary Excel files
+    depth: 1
+
+destination:
+  implementation: bitbucket
+  config:
+    url: https://bitbucket.org/myworkspace/excel-converted
+    branch: main
+    token: ${BITBUCKET_TOKEN}
+    output_path: converted/
+
+converter:
+  implementation: windows_excel  # or 'libreoffice' on Linux
+  config:
+    timeout: 300
+
+flattener:
+  implementation: noop  # No flattening, just copy converted file
+  config: {}

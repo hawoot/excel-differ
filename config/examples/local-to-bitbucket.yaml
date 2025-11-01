@@ -1,0 +1,35 @@
+# Excel Differ Configuration Example
+# Scenario: Local Folder Source → Bitbucket Destination
+# Use case: Process Excel files from local folder, upload flattened outputs to Bitbucket
+
+source:
+  implementation: local_folder
+  config:
+    folder_path: /path/to/excel/files
+    include_patterns:
+      - "**/*.xlsx"
+      - "**/*.xlsm"
+    exclude_patterns:
+      - "**/~$*"          # Excel temp files
+      - "**/.~lock.*"     # LibreOffice lock files
+      - "**/archive/**"
+
+destination:
+  implementation: bitbucket
+  config:
+    url: https://bitbucket.org/myworkspace/my-repo
+    branch: main
+    token: ${BITBUCKET_TOKEN}
+    output_path: flattened/
+
+converter:
+  implementation: noop
+  config: {}
+
+flattener:
+  implementation: openpyxl
+  config:
+    include_computed: false
+    include_literal: true
+    include_formats: true
+    timeout: 900

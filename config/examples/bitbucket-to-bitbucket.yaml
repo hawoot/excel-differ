@@ -1,0 +1,37 @@
+# Excel Differ Configuration Example
+# Scenario: Bitbucket Source → Bitbucket Destination (same repo)
+# Use case: Automated flattening within same repository
+
+source:
+  implementation: bitbucket
+  config:
+    url: https://bitbucket.org/myworkspace/my-repo
+    branch: main
+    token: ${BITBUCKET_TOKEN}
+    include_patterns:
+      - "data/**/*.xlsx"
+      - "reports/**/*.xlsm"
+    exclude_patterns:
+      - "**/archive/**"
+      - "**/temp/**"
+    depth: 1  # Only process latest commit if no sync state
+
+destination:
+  implementation: bitbucket
+  config:
+    url: https://bitbucket.org/myworkspace/my-repo
+    branch: main
+    token: ${BITBUCKET_TOKEN}
+    output_path: flattened/
+
+converter:
+  implementation: noop
+  config: {}
+
+flattener:
+  implementation: openpyxl
+  config:
+    include_computed: false
+    include_literal: true
+    include_formats: true
+    timeout: 900
