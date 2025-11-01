@@ -20,7 +20,7 @@ set -e  # Exit on error
 # Directory paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPONENT_ROOT="$SCRIPT_DIR/.."
-VENV_DIR="venv"
+VENV_DIR="$COMPONENT_ROOT/openpyxl_impl/venv"
 REQUIREMENTS_FILE="$SCRIPT_DIR/requirements.txt"
 
 # Python command (change if needed)
@@ -63,11 +63,11 @@ if ! pip install -r "$REQUIREMENTS_FILE"; then
     exit 1
 fi
 
-# Load .env file if it exists (optional configuration)
-if [ -f ".env" ]; then
-    echo -e "${GREEN}[+] Loading environment from .env${NC}"
+# Load .env file from project root if it exists (for tokens, etc.)
+if [ -f "../../../.env" ]; then
+    echo -e "${GREEN}[+] Loading environment from project root .env${NC}"
     set -a  # Auto-export variables
-    source .env
+    source ../../../.env
     set +a
 fi
 
@@ -95,7 +95,10 @@ fi
 #   ./scripts/run_flattener.sh info ./snippets/sample.xlsx
 #   ./scripts/run_flattener.sh --help
 
-python -m src "$@"
+# Change to component root so Python can find openpyxl.src as a package
+cd "$COMPONENT_ROOT"
+
+python -m openpyxl_impl.src "$@"
 EXIT_CODE=$?
 
 # Deactivate virtual environment and exit

@@ -22,7 +22,7 @@ REM ============================================================================
 REM Directory paths
 set "SCRIPT_DIR=%~dp0"
 set "COMPONENT_ROOT=%SCRIPT_DIR%.."
-set "VENV_DIR=venv"
+set "VENV_DIR=openpyxl_impl\venv"
 set "DIST_DIR=dist"
 set "BUILD_DIR=build"
 set "REQUIREMENTS_FILE=%SCRIPT_DIR%requirements.txt"
@@ -31,7 +31,7 @@ REM Python command (change if needed)
 set "PYTHON_CMD=python"
 
 REM Entry point for PyInstaller
-set "ENTRY_POINT=src\__main__.py"
+set "ENTRY_POINT=openpyxl_impl\src\__main__.py"
 
 REM Executable name
 set "EXECUTABLE_NAME=excel-flattener"

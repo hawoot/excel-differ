@@ -20,7 +20,7 @@ REM ============================================================================
 REM Directory paths
 set "SCRIPT_DIR=%~dp0"
 set "COMPONENT_ROOT=%SCRIPT_DIR%.."
-set "VENV_DIR=venv"
+set "VENV_DIR=openpyxl_impl\venv"
 set "REQUIREMENTS_FILE=%SCRIPT_DIR%requirements.txt"
 
 REM Python command (change if needed)
@@ -89,7 +89,7 @@ REM   scripts\run_flattener.bat config
 REM   scripts\run_flattener.bat info .\snippets\sample.xlsx
 REM   scripts\run_flattener.bat --help
 
-python -m src %*
+python -m openpyxl_impl.src %*
 set EXIT_CODE=%ERRORLEVEL%
 
 REM Deactivate virtual environment and exit

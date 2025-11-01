@@ -22,7 +22,7 @@ set -e  # Exit on error
 # Directory paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPONENT_ROOT="$SCRIPT_DIR/.."
-VENV_DIR="venv"
+VENV_DIR="$COMPONENT_ROOT/openpyxl_impl/venv"
 DIST_DIR="dist"
 BUILD_DIR="build"
 REQUIREMENTS_FILE="$SCRIPT_DIR/requirements.txt"
@@ -31,7 +31,7 @@ REQUIREMENTS_FILE="$SCRIPT_DIR/requirements.txt"
 PYTHON_CMD="python3"
 
 # Entry point for PyInstaller
-ENTRY_POINT="src/__main__.py"
+ENTRY_POINT="openpyxl_impl/src/__main__.py"
 
 # Executable name
 EXECUTABLE_NAME="excel-flattener"
