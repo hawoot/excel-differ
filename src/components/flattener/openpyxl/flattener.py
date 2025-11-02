@@ -5,10 +5,11 @@ Coordinates all extraction modules to produce a deterministic, diff-friendly
 text representation of an Excel workbook.
 """
 import logging
+import shutil
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional
 
 from openpyxl import load_workbook
 from openpyxl.workbook import Workbook
@@ -16,7 +17,6 @@ from openpyxl.workbook import Workbook
 from .utils import (
     get_file_hash,
     create_flat_root_name,
-    setup_logging
 )
 from .manifest import Manifest
 from .metadata import extract_metadata, write_metadata_file
@@ -48,6 +48,7 @@ class Flattener:
         include_computed: bool = False,
         include_literal: bool = True,
         include_formats: bool = True,
+        include_origin_file: bool = False,
         timeout: int = 900,
         max_file_size_mb: int = 200
     ):
@@ -59,6 +60,7 @@ class Flattener:
             include_computed: Whether to extract computed values (formula results) [default: False]
             include_literal: Whether to extract literal values (hardcoded values) [default: True]
             include_formats: Whether to extract cell formatting [default: True]
+            include_origin_file: Whether to include original Excel file in output [default: False]
             timeout: Maximum extraction time in seconds [default: 900]
             max_file_size_mb: Maximum file size in MB [default: 200]
         """
@@ -66,6 +68,7 @@ class Flattener:
         self.include_computed = include_computed
         self.include_literal = include_literal
         self.include_formats = include_formats
+        self.include_origin_file = include_origin_file
         self.timeout = timeout
         self.max_file_size_mb = max_file_size_mb
 
@@ -145,6 +148,10 @@ class Flattener:
                 self._extract_tables(wb, flat_root, manifest)
                 self._extract_charts(wb, flat_root, manifest)
                 self._extract_named_ranges(wb, flat_root, manifest)
+
+                # Copy original file if requested
+                if self.include_origin_file:
+                    self._copy_origin_file(excel_file, flat_root, manifest)
 
                 # Save manifest
                 manifest_path = flat_root / 'manifest.json'
@@ -406,6 +413,34 @@ class Flattener:
         except Exception as e:
             logger.error(f"Error extracting named ranges: {e}", exc_info=True)
             manifest.add_warning(f"Named ranges extraction failed: {e}")
+
+    def _copy_origin_file(self, excel_file: Path, flat_root: Path, manifest: Manifest) -> None:
+        """
+        Copy original Excel file to flat output.
+
+        Args:
+            excel_file: Path to original Excel file
+            flat_root: Flat output directory
+            manifest: Manifest to track copied file
+        """
+        logger.info("Copying original file...")
+        try:
+            # Create origin subdirectory
+            origin_dir = flat_root / 'origin'
+            origin_dir.mkdir(parents=True, exist_ok=True)
+
+            # Copy file with original name and extension
+            dest_file = origin_dir / excel_file.name
+            shutil.copy2(excel_file, dest_file)
+
+            # Add to manifest
+            manifest.add_file(dest_file, flat_root)
+
+            logger.info(f"Original file copied: {excel_file.name}")
+
+        except Exception as e:
+            logger.error(f"Error copying original file: {e}", exc_info=True)
+            manifest.add_warning(f"Original file copy failed: {e}")
 
     def _sanitise_sheet_name(self, name: str) -> str:
         """

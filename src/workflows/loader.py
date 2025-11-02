@@ -110,7 +110,7 @@ import yaml
 from pathlib import Path
 from dotenv import load_dotenv
 
-from .schema import WorkflowDefinition, SourceDestinationSpec, ComponentSpec, StateSpec
+from .schema import WorkflowDefinition, SourceDestinationSpec, ComponentSpec, StateSpec, LoggingSpec
 
 
 def load_workflow(yaml_path: Path) -> WorkflowDefinition:
@@ -159,6 +159,13 @@ def load_workflow(yaml_path: Path) -> WorkflowDefinition:
                 file_path=data['state'].get('file_path', './.excel-differ-state.json')
             )
 
+        # Parse optional logging section
+        logging_spec = None
+        if 'logging' in data:
+            logging_spec = LoggingSpec(
+                log_dir=data['logging'].get('log_dir', './logs')
+            )
+
         workflow = WorkflowDefinition(
             source=SourceDestinationSpec(
                 implementation=data['source']['implementation'],
@@ -176,7 +183,8 @@ def load_workflow(yaml_path: Path) -> WorkflowDefinition:
                 implementation=data['flattener']['implementation'],
                 config=data['flattener'].get('config', {})
             ),
-            state=state_spec
+            state=state_spec,
+            logging=logging_spec
         )
     except KeyError as e:
         raise ValueError(f"Invalid workflow structure in {yaml_path}: missing {e}")

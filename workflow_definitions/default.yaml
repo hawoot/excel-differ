@@ -5,6 +5,10 @@
 #
 # Default behavior: Process local Excel files and output to local folder
 
+# Logging configuration
+logging:
+  log_dir: ./logs
+
 # State file configuration
 state:
   file_path: ./tmp/state/.excel-differ-state.json
@@ -14,9 +18,9 @@ source:
   config:
     folder_path: ./tmp/input            # Input directory (create this folder)
     include_patterns:
-      - "*.xlsx"                    # Include .xlsx files in root
+      - "*.xlsb"                    # Include .xlsb files in root
       - "*.xlsm"                    # Include .xlsm files in root
-      - "**/*.xlsx"                 # Include .xlsx files in subdirectories
+      - "**/*.xlsb"                 # Include .xlsb files in subdirectories
       - "**/*.xlsm"                 # Include .xlsm files in subdirectories
     exclude_patterns:
       - "**/~$*"                    # Exclude Excel temp files
@@ -39,5 +43,6 @@ flattener:
     include_computed: false        # Don't include computed values (formulas only)
     include_literal: true          # Include literal values
     include_formats: true          # Include cell formatting
-    timeout: 900                   # 15 minute timeout per file
+    include_origin_file: true      # Include original Excel file in flat output
+    timeout: 3600                  # 1 hour timeout per file
     max_file_size_mb: 200          # Max file size: 200 MB

@@ -4,11 +4,13 @@ Flatten Command - Flatten a single Excel file
 Extracts a standalone Excel file to text representation.
 """
 
+import os
 import sys
 from pathlib import Path
 import click
 
 from src.registry import registry
+from src.utils.logging_setup import setup_logging
 
 
 @click.command('flatten')
@@ -59,6 +61,10 @@ def flatten_command(
       # Custom output directory
       python main.py flatten workbook.xlsx -o ./output
     """
+    # Initialize logging
+    log_level = os.getenv('EXCEL_DIFFER_LOG_LEVEL', 'INFO').upper()
+    setup_logging(log_level=log_level, log_dir='./logs', component='excel-differ-flatten-command')
+
     # Prepare flattener config
     flattener_config = {
         'output_dir': str(output_dir) if output_dir else './tmp/flats',

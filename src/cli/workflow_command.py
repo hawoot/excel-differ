@@ -4,9 +4,12 @@ Workflow Command - Run Excel Differ workflow
 Executes a complete workflow: source → convert → flatten → destination
 """
 
+import os
 import sys
 from pathlib import Path
 import click
+
+from src.utils.logging_setup import setup_logging
 
 
 @click.command('workflow')
@@ -59,12 +62,21 @@ def workflow_command(config_file):
         click.echo("Creating components...")
         orchestrator, workflow = create_orchestrator_from_config(config_file)
 
+        # Initialize logging from workflow config
+        log_level = os.getenv('EXCEL_DIFFER_LOG_LEVEL', 'INFO').upper()
+        setup_logging(
+            log_level=log_level,
+            log_dir=workflow.logging.log_dir,
+            component='excel-differ-workflow-command'
+        )
+
         # Display workflow info
         click.echo(f"\nWorkflow Configuration:")
         click.echo(f"  Source: {workflow.source.implementation}")
         click.echo(f"  Destination: {workflow.destination.implementation}")
         click.echo(f"  Converter: {workflow.converter.implementation}")
         click.echo(f"  Flattener: {workflow.flattener.implementation}")
+        click.echo(f"  Log dir: {workflow.logging.log_dir}")
         click.echo()
 
         # Run orchestrator

@@ -153,6 +153,20 @@ class StateSpec:
 
 
 @dataclass
+class LoggingSpec:
+    """
+    Logging configuration.
+
+    Attributes:
+        log_dir: Directory for log files (e.g., './logs', './tmp/logs')
+
+    Example:
+        logging = LoggingSpec(log_dir='./logs')
+    """
+    log_dir: str
+
+
+@dataclass
 class WorkflowDefinition:
     """
     Complete Excel Differ workflow definition.
@@ -163,6 +177,7 @@ class WorkflowDefinition:
         converter: How to convert files (noop, windows_excel, etc.)
         flattener: How to flatten Excel files (openpyxl, noop, etc.)
         state: Optional state file configuration (defaults to ./.excel-differ-state.json)
+        logging: Optional logging configuration (defaults to ./logs)
 
     Example:
         workflow = WorkflowDefinition(
@@ -193,8 +208,11 @@ class WorkflowDefinition:
     converter: ComponentSpec
     flattener: ComponentSpec
     state: Optional[StateSpec] = None
+    logging: Optional[LoggingSpec] = None
 
     def __post_init__(self):
-        """Set default state config if not provided"""
+        """Set default state and logging config if not provided"""
         if self.state is None:
             self.state = StateSpec(file_path='./.excel-differ-state.json')
+        if self.logging is None:
+            self.logging = LoggingSpec(log_dir='./logs')

@@ -4,12 +4,15 @@ Diff Command - Compare two Excel files
 On-demand diff that flattens two files and compares them.
 """
 
+import os
 import sys
 from pathlib import Path
 import click
 
 from src.registry import registry
-from src.differ import Differ, JSONFormatter
+from src.differ.differ import Differ
+from src.differ.formatters.json_formatter import JSONFormatter
+from src.utils.logging_setup import setup_logging
 
 
 @click.command('diff')
@@ -49,6 +52,10 @@ def diff_command(file1, file2, output, format):
       # Compare and see results
       python main.py diff old-version.xlsx new-version.xlsx
     """
+    # Initialize logging
+    log_level = os.getenv('EXCEL_DIFFER_LOG_LEVEL', 'INFO').upper()
+    setup_logging(log_level=log_level, log_dir='./logs', component='excel-differ-diff-command')
+
     # Create flattener for diffing
     flattener_config = {
         'output_dir': './tmp/diff-flats',

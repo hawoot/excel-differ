@@ -195,7 +195,7 @@ class Orchestrator:
             logger.info(f"Flattening: {current_file.name}")
             flatten_result = self.flattener.flatten(
                 excel_file=current_file,
-                origin=None,
+                origin=str(file_info.path),
             )
 
             if not flatten_result.success:
