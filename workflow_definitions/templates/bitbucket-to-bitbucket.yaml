@@ -1,6 +1,10 @@
 # Excel Differ Workflow: Bitbucket → Bitbucket (same repo)
 # Use case: Automated flattening within same repository
 
+# State file configuration
+state:
+  file_path: ./tmp/.excel-differ-state.json
+
 source:
   implementation: bitbucket
   config:

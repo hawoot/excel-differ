@@ -1,6 +1,10 @@
 # Excel Differ Workflow: Local Folder → Local Folder
 # Use case: Process Excel files from one local folder, output to another
 
+# State file configuration
+state:
+  file_path: ./tmp/.excel-differ-state.json
+
 source:
   implementation: local_folder
   config:

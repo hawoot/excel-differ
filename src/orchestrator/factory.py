@@ -44,15 +44,22 @@ def create_orchestrator_from_config(config_file: Path) -> Tuple[Orchestrator, Wo
     # Load workflow definition
     workflow = load_workflow(config_file)
 
+    # Inject state file path into source and destination configs
+    source_config = workflow.source.config.copy()
+    source_config['state_file_path'] = workflow.state.file_path
+
+    destination_config = workflow.destination.config.copy()
+    destination_config['state_file_path'] = workflow.state.file_path
+
     # Create component instances from workflow definition
     source = registry.create_source(
         workflow.source.implementation,
-        workflow.source.config
+        source_config
     )
 
     destination = registry.create_destination(
         workflow.destination.implementation,
-        workflow.destination.config
+        destination_config
     )
 
     converter = registry.create_converter(

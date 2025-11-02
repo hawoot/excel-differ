@@ -1,6 +1,10 @@
 # Excel Differ Workflow: Local Folder → Bitbucket
 # Use case: Process Excel files from local folder, upload flattened outputs to Bitbucket
 
+# State file configuration
+state:
+  file_path: ./tmp/.excel-differ-state.json
+
 source:
   implementation: local_folder
   config:

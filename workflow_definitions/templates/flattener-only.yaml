@@ -1,6 +1,10 @@
 # Excel Differ Workflow: Flattener-Only (No Conversion)
 # Use case: Only flatten Excel files, no format conversion needed
 
+# State file configuration
+state:
+  file_path: ./tmp/.excel-differ-state.json
+
 source:
   implementation: bitbucket
   config:

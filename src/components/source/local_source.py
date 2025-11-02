@@ -37,25 +37,24 @@ class LocalSource(SourceInterface):
                 - folder_path: Source folder path (required)
                 - include_patterns: List of glob patterns to include (optional)
                 - exclude_patterns: List of glob patterns to exclude (optional)
-                - destination_folder: Where to read sync state from (required)
+                - state_file_path: Path to state file (injected by factory)
         """
         super().__init__(config)
         self.folder_path = Path(config['folder_path'])
         self.include_patterns = config.get('include_patterns', ['*.xlsx', '*.xlsm', '**/*.xlsx', '**/*.xlsm'])
         self.exclude_patterns = config.get('exclude_patterns', [])
 
-        # Destination folder for reading sync state
-        self.destination_folder = Path(config.get('destination_folder', './output'))
-        self.state_file = self.destination_folder / '.excel-differ-state.json'
+        # State file path (injected by factory from workflow definition)
+        self.state_file = Path(config.get('state_file_path', './.excel-differ-state.json'))
 
         if not self.folder_path.exists():
             raise ValueError(f"Source folder does not exist: {self.folder_path}")
 
     def get_sync_state(self) -> SourceSyncState:
         """
-        Get last synchronisation state from destination.
+        Get last synchronisation state.
 
-        Reads .excel-differ-state.json from destination folder.
+        Reads state file from configured path.
 
         Returns:
             SourceSyncState with last processed version and date,

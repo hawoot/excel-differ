@@ -2,6 +2,10 @@
 # Use case: Only convert .xlsb to .xlsm, no flattening
 # Result: Converted files are uploaded as-is
 
+# State file configuration
+state:
+  file_path: ./tmp/.excel-differ-state.json
+
 source:
   implementation: bitbucket
   config:

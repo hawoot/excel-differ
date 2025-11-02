@@ -2,7 +2,7 @@
 LocalDestination - Save files to local folder
 
 Simple destination that writes files to a local directory.
-Maintains sync state in .excel-differ-state.json
+Maintains sync state in configured state file.
 """
 
 import json
@@ -28,19 +28,23 @@ class LocalDestination(DestinationInterface):
         Args:
             config: Configuration dict with:
                 - folder_path: Destination folder path (required)
+                - state_file_path: Path to state file (injected by factory)
         """
         super().__init__(config)
         self.folder_path = Path(config['folder_path'])
-        self.state_file = self.folder_path / '.excel-differ-state.json'
+        self.state_file = Path(config.get('state_file_path', './.excel-differ-state.json'))
 
         # Create destination folder if it doesn't exist
         self.folder_path.mkdir(parents=True, exist_ok=True)
 
+        # Create state file parent directory if it doesn't exist
+        self.state_file.parent.mkdir(parents=True, exist_ok=True)
+
     def save_sync_state(self, state: SourceSyncState) -> None:
         """
-        Save synchronisation state to destination folder.
+        Save synchronisation state.
 
-        Writes .excel-differ-state.json file with last processed version and date.
+        Writes state file with last processed version and date.
 
         Args:
             state: SourceSyncState to save

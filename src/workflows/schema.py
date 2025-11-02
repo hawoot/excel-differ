@@ -139,6 +139,20 @@ class ComponentSpec:
 
 
 @dataclass
+class StateSpec:
+    """
+    State file configuration.
+
+    Attributes:
+        file_path: Path to the state file (e.g., './state/sync-state.json')
+
+    Example:
+        state = StateSpec(file_path='./state/sync-state.json')
+    """
+    file_path: str
+
+
+@dataclass
 class WorkflowDefinition:
     """
     Complete Excel Differ workflow definition.
@@ -148,6 +162,7 @@ class WorkflowDefinition:
         destination: Where to upload flattened results
         converter: How to convert files (noop, windows_excel, etc.)
         flattener: How to flatten Excel files (openpyxl, noop, etc.)
+        state: Optional state file configuration (defaults to ./.excel-differ-state.json)
 
     Example:
         workflow = WorkflowDefinition(
@@ -169,10 +184,17 @@ class WorkflowDefinition:
             flattener=ComponentSpec(
                 implementation='openpyxl',
                 config={'include_computed': False}
-            )
+            ),
+            state=StateSpec(file_path='./state/sync-state.json')
         )
     """
     source: SourceDestinationSpec
     destination: SourceDestinationSpec
     converter: ComponentSpec
     flattener: ComponentSpec
+    state: Optional[StateSpec] = None
+
+    def __post_init__(self):
+        """Set default state config if not provided"""
+        if self.state is None:
+            self.state = StateSpec(file_path='./.excel-differ-state.json')

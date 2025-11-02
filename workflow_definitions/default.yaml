@@ -5,11 +5,14 @@
 #
 # Default behavior: Process local Excel files and output to local folder
 
+# State file configuration
+state:
+  file_path: ./tmp/state/.excel-differ-state.json
+
 source:
   implementation: local_folder
   config:
     folder_path: ./tmp/input            # Input directory (create this folder)
-    destination_folder: ./tmp/output    # Needed to read sync state
     include_patterns:
       - "*.xlsx"                    # Include .xlsx files in root
       - "*.xlsm"                    # Include .xlsm files in root
