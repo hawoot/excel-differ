@@ -254,24 +254,30 @@ class WindowsExcelConverter(ConverterInterface):
                 else:
                     output_path = input_path.parent / (input_path.stem + '.xlsm')
 
-                # Start Excel with better settings
+                # Start Excel - minimal settings only
                 excel = self.win32com.Dispatch("Excel.Application")
-                excel.Visible = False
-                excel.DisplayAlerts = False
-                excel.EnableEvents = False  # Disable events to prevent automation issues
-                excel.AskToUpdateLinks = False  # Don't prompt for links
-                excel.ScreenUpdating = False
-                excel.Calculation = -4135  # xlCalculationManual - prevent auto-calc
 
-                # Open workbook with options to prevent updates
+                # Try to set Visible to False
+                try:
+                    excel.Visible = False
+                except Exception:
+                    pass  # If even this fails, continue anyway
+
+                # Only set DisplayAlerts - this is the most reliable property
+                try:
+                    excel.DisplayAlerts = False
+                except Exception:
+                    pass  # If even this fails, continue anyway
+                
+                try:
+                    excel.EnableEvents = False  # Disable events to prevent automation issues
+                    excel.AskToUpdateLinks = False  # Don't prompt for links
+                    excel.ScreenUpdating = False
+                except Exception:
+                    pass
+                # Open workbook - minimal options
                 abs_input = str(input_path.absolute())
-                workbook = excel.Workbooks.Open(
-                    abs_input,
-                    UpdateLinks=0,  # Don't update external links
-                    ReadOnly=False,
-                    IgnoreReadOnlyRecommended=True,
-                    Notify=False
-                )
+                workbook = excel.Workbooks.Open(abs_input, UpdateLinks=0)
 
                 # Convert: SaveAs with xlsm format
                 # FileFormat 52 = xlOpenXMLWorkbookMacroEnabled (.xlsm)
