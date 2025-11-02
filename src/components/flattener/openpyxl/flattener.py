@@ -216,11 +216,13 @@ class Flattener:
             )
 
         # Check extension
-        valid_extensions = ['.xlsx', '.xlsm', '.xlsb', '.xls']
+        # Note: .xlsb files are NOT supported by openpyxl and must be converted first
+        valid_extensions = ['.xlsx', '.xlsm', '.xls']
         if file_path.suffix.lower() not in valid_extensions:
             raise ValueError(
                 f"Unsupported file type: {file_path.suffix} "
-                f"(supported: {', '.join(valid_extensions)})"
+                f"(supported: {', '.join(valid_extensions)}). "
+                f"Note: .xlsb files require conversion using WindowsExcelConverter"
             )
 
         logger.info(f"✓ File validated ({file_size_mb:.1f}MB)")

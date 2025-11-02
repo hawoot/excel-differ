@@ -18,15 +18,12 @@ source:
   config:
     folder_path: ./tmp/input            # Input directory (create this folder)
     include_patterns:
-      - "*.xlsb"                    # Include .xlsb files in root
-      - "*.xlsm"                    # Include .xlsm files in root
-      - "**/*.xlsb"                 # Include .xlsb files in subdirectories
-      - "**/*.xlsm"                 # Include .xlsm files in subdirectories
+      - "*.xlsx"
+      - "*.xlsm"
+      - "*.xlsb"
     exclude_patterns:
-      - "**/~$*"                    # Exclude Excel temp files
-      - "**/.~lock.*"               # Exclude LibreOffice lock files
-      - "**/archive/**"             # Exclude archive folders
-      - "**/backup/**"              # Exclude backup folders
+      - "**/~$*"          # Excel temp files
+      - "**/.~lock.*"     # LibreOffice lock files
 
 destination:
   implementation: local_folder

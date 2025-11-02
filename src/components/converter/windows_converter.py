@@ -10,12 +10,15 @@ Requires:
 - pywin32 package (win32com.client)
 """
 
+import logging
 import platform
 import time
 from pathlib import Path
 from typing import Optional
 
 from src.interfaces import ConverterInterface, ConversionResult
+
+logger = logging.getLogger(__name__)
 
 
 class WindowsExcelConverter(ConverterInterface):
@@ -98,7 +101,8 @@ class WindowsExcelConverter(ConverterInterface):
             excel = self.win32com.Dispatch("Excel.Application")
             excel.Quit()
             return True
-        except:
+        except Exception as e:
+            logger.debug(f"Excel COM not available: {e}")
             return False
 
     def convert(
@@ -181,6 +185,7 @@ class WindowsExcelConverter(ConverterInterface):
             )
 
         except Exception as e:
+            logger.error(f"Excel COM conversion failed for {input_path.name}: {e}", exc_info=True)
             error_msg = f"Excel COM conversion failed: {str(e)}"
 
             return ConversionResult(

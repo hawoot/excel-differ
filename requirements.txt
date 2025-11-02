@@ -4,3 +4,4 @@ PyYAML>=5.0.0
 python-dotenv>=0.10.0
 pyinstaller>=5.0.0
 oletools>=0.60.0
+pywin32>=305; platform_system=="Windows"

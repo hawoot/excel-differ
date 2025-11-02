@@ -1,30 +1,30 @@
 # Excel Differ Workflow: Flattener-Only (No Conversion)
 # Use case: Only flatten Excel files, no format conversion needed
 
+# Logging configuration
+logging:
+  log_dir: ./logs
+
 # State file configuration
 state:
-  file_path: ./tmp/.excel-differ-state.json
+  file_path: ./tmp/state/.excel-differ-state-flattener.json
 
 source:
-  implementation: bitbucket
+  implementation: local_folder
   config:
-    url: https://bitbucket.org/myworkspace/excel-files
-    branch: main
-    token: ${BITBUCKET_SOURCE_TOKEN}
+    folder_path: ./tmp/input            # Input directory (create this folder)
     include_patterns:
       - "**/*.xlsx"
       - "**/*.xlsm"
+      - "**/*.xlsb"
     exclude_patterns:
-      - "**/archive/**"
-    depth: 1
+      - "**/~$*"          # Excel temp files
+      - "**/.~lock.*"     # LibreOffice lock files
 
 destination:
-  implementation: bitbucket
+  implementation: local_folder
   config:
-    url: https://bitbucket.org/myworkspace/excel-flattened
-    branch: main
-    token: ${BITBUCKET_DEST_TOKEN}
-    output_path: /
+    folder_path: ./tmp/output           # Output directory (will be created)
 
 converter:
   implementation: noop  # No conversion

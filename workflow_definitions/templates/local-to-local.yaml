@@ -1,17 +1,22 @@
 # Excel Differ Workflow: Local Folder → Local Folder
 # Use case: Process Excel files from one local folder, output to another
 
+# Logging configuration
+logging:
+  log_dir: ./logs
+
 # State file configuration
 state:
-  file_path: ./tmp/.excel-differ-state.json
+  file_path: ./tmp/state/.excel-differ-state.json
 
 source:
   implementation: local_folder
   config:
-    folder_path: /path/to/excel/files
+    folder_path: ./tmp/input            # Input directory (create this folder)
     include_patterns:
       - "**/*.xlsx"
       - "**/*.xlsm"
+      - "**/*.xlsb"
     exclude_patterns:
       - "**/~$*"          # Excel temp files
       - "**/.~lock.*"     # LibreOffice lock files
@@ -19,7 +24,7 @@ source:
 destination:
   implementation: local_folder
   config:
-    folder_path: /path/to/output
+    folder_path: ./tmp/output           # Output directory (will be created)
 
 converter:
   implementation: noop

@@ -1,27 +1,32 @@
 # Excel Differ Workflow: Bitbucket → Local Folder
 # Use case: Pull Excel files from Bitbucket, save flattened outputs locally
 
+# Logging configuration
+logging:
+  log_dir: ./logs
+
 # State file configuration
 state:
-  file_path: ./tmp/.excel-differ-state.json
+  file_path: ./tmp/state/.excel-differ-state.json
 
 source:
   implementation: bitbucket
   config:
-    url: https://bitbucket.org/workspace/repo
+    url: https://bitbucket.org/myworkspace/my-repo
     branch: main
     token: ${BITBUCKET_TOKEN}
     include_patterns:
-      - "**/*.xlsx"
-      - "**/*.xlsm"
+      - "data/**/*.xlsx"
+      - "reports/**/*.xlsm"
     exclude_patterns:
       - "**/archive/**"
-    depth: 1  # Process only latest commit
+      - "**/temp/**"
+    depth: 1  # Only process latest commit if no sync state
 
 destination:
   implementation: local_folder
   config:
-    folder_path: /path/to/output
+    folder_path: ./tmp/output           # Output directory (will be created)
 
 converter:
   implementation: noop
