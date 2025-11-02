@@ -285,11 +285,17 @@ class WindowsExcelConverter(ConverterInterface):
                 workbook.SaveAs(abs_output, FileFormat=52)
 
                 # Close workbook
-                workbook.Close(SaveChanges=False)
+                try:
+                    workbook.Close(SaveChanges=False)
+                except Exception:
+                    pass
                 workbook = None
 
                 # Quit Excel
-                excel.Quit()
+                try:
+                    excel.Quit()
+                except Exception:
+                    pass
                 excel = None
 
                 logger.info(f"Successfully converted {input_path.name} to {output_path.name}")
