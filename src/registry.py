@@ -166,6 +166,8 @@ def register_all_components():
     from src.components.flattener.openpyxl.openpyxl_flattener import OpenpyxlFlattener
     from src.components.source.local_source import LocalSource
     from src.components.destination.local_destination import LocalDestination
+    from src.components.source.bitbucket_source import BitbucketSource
+    from src.components.destination.bitbucket_destination import BitbucketDestination
 
     # Import Windows converter (may fail on non-Windows)
     try:
@@ -176,9 +178,11 @@ def register_all_components():
 
     # Register sources
     registry.register_source('local_folder', LocalSource)
+    registry.register_source('bitbucket', BitbucketSource)
 
     # Register destinations
     registry.register_destination('local_folder', LocalDestination)
+    registry.register_destination('bitbucket', BitbucketDestination)
 
     # Register converters
     registry.register_converter('noop', NoOpConverter)
@@ -188,10 +192,3 @@ def register_all_components():
     # Register flatteners
     registry.register_flattener('noop', NoOpFlattener)
     registry.register_flattener('openpyxl', OpenpyxlFlattener)
-
-    # TODO: Add these as they're implemented:
-    # from src.components.source.bitbucket_source import BitbucketSource
-    # from src.components.destination.bitbucket_destination import BitbucketDestination
-    #
-    # registry.register_source('bitbucket', BitbucketSource)
-    # registry.register_destination('bitbucket', BitbucketDestination)

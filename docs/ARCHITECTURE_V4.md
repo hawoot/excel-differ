@@ -66,12 +66,14 @@ excel-differ/
 │   ├── registry.py                   # Component registry
 │   │
 │   ├── components/                   # Component implementations ONLY
+│   │   ├── common/                   # Shared utilities
+│   │   │   └── bitbucket_client.py   # Reusable Bitbucket API client
 │   │   ├── source/                   # Source implementations
-│   │   │   ├── local_source.py       # (to be implemented)
-│   │   │   └── bitbucket_source.py   # (to be implemented)
+│   │   │   ├── local_source.py       # ✅ Implemented
+│   │   │   └── bitbucket_source.py   # ✅ Implemented
 │   │   ├── destination/              # Destination implementations
-│   │   │   ├── local_destination.py  # (to be implemented)
-│   │   │   └── bitbucket_destination.py  # (to be implemented)
+│   │   │   ├── local_destination.py  # ✅ Implemented
+│   │   │   └── bitbucket_destination.py  # ✅ Implemented
 │   │   ├── converter/
 │   │   │   ├── noop_converter.py
 │   │   │   └── windows_converter.py  # (to be implemented)
@@ -345,14 +347,15 @@ python main.py workflow my-workflow.yaml   # Custom workflow
 - All three CLIs (flatten, diff, workflow)
 - Default workflow configuration
 - Auto-registration system
-
-### ⏳ To Be Implemented
-
 - Orchestrator core logic
 - LocalSource component
 - LocalDestination component
 - BitbucketSource component
 - BitbucketDestination component
+- Bitbucket API client (reusable utility)
+
+### ⏳ To Be Implemented
+
 - HTML differ formatter
 - Windows Excel converter
 
