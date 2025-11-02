@@ -24,9 +24,8 @@ source:
 destination:
   implementation: bitbucket
   config:
-    url: https://bitbucket.org/myworkspace/my-repo
+    url: https://api.bitbucket.org/2.0/repositories/myworkspace/my-repo
     branch: main
-    token: ${BITBUCKET_TOKEN}
     output_path: flattened/
 
 converter:
