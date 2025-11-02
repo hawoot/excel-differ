@@ -112,28 +112,19 @@ class Manifest:
 
     def set_origin(
         self,
-        origin_repo: Optional[str] = None,
-        origin_path: Optional[str] = None,
-        origin_commit: Optional[str] = None,
-        origin_commit_message: Optional[str] = None,
+        origin: Optional[str] = None,
     ) -> None:
         """
         Set origin information for the workbook.
 
         Args:
-            origin_repo: Git repository URL
-            origin_path: Path to file in repository
-            origin_commit: Git commit SHA
-            origin_commit_message: Commit message
+            origin: Git repository URL
         """
-        if any([origin_repo, origin_path, origin_commit, origin_commit_message]):
+        if origin:
             self.origin = {
-                'origin_repo': origin_repo or '',
-                'origin_path': origin_path or '',
-                'origin_commit': origin_commit or '',
-                'origin_commit_message': origin_commit_message or ''
+                'origin': origin or '',
             }
-            logger.debug(f"Set origin: {origin_repo}/{origin_path}")
+            logger.debug(f"Set origin: {origin}")
 
     def to_dict(self) -> Dict[str, Any]:
         """

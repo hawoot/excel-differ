@@ -28,9 +28,7 @@ class NoOpFlattener(FlattenerInterface):
     def flatten(
         self,
         excel_file: Path,
-        origin_repo: Optional[str] = None,
-        origin_path: Optional[str] = None,
-        origin_commit: Optional[str] = None
+        origin: Optional[str] = None,
     ) -> FlattenResult:
         """
         "Flatten" by copying file to output directory.

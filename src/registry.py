@@ -164,21 +164,34 @@ def register_all_components():
     from src.components.converter.noop_converter import NoOpConverter
     from src.components.flattener.noop.noop_flattener import NoOpFlattener
     from src.components.flattener.openpyxl.openpyxl_flattener import OpenpyxlFlattener
+    from src.components.source.local_source import LocalSource
+    from src.components.destination.local_destination import LocalDestination
+
+    # Import Windows converter (may fail on non-Windows)
+    try:
+        from src.components.converter.windows_converter import WindowsExcelConverter
+        windows_converter_available = True
+    except (ImportError, RuntimeError):
+        windows_converter_available = False
+
+    # Register sources
+    registry.register_source('local_folder', LocalSource)
+
+    # Register destinations
+    registry.register_destination('local_folder', LocalDestination)
 
     # Register converters
     registry.register_converter('noop', NoOpConverter)
+    if windows_converter_available:
+        registry.register_converter('windows_excel', WindowsExcelConverter)
 
     # Register flatteners
     registry.register_flattener('noop', NoOpFlattener)
     registry.register_flattener('openpyxl', OpenpyxlFlattener)
 
     # TODO: Add these as they're implemented:
-    # from src.components.source.local_source import LocalSource
     # from src.components.source.bitbucket_source import BitbucketSource
-    # from src.components.destination.local_destination import LocalDestination
     # from src.components.destination.bitbucket_destination import BitbucketDestination
     #
-    # registry.register_source('local_folder', LocalSource)
     # registry.register_source('bitbucket', BitbucketSource)
-    # registry.register_destination('local_folder', LocalDestination)
     # registry.register_destination('bitbucket', BitbucketDestination)

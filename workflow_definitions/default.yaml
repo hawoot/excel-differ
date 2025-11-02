@@ -8,20 +8,23 @@
 source:
   implementation: local_folder
   config:
-    folder_path: ./input          # Input directory (create this folder)
+    folder_path: ./tmp/input            # Input directory (create this folder)
+    destination_folder: ./tmp/output    # Needed to read sync state
     include_patterns:
-      - "**/*.xlsx"                # Include all .xlsx files
-      - "**/*.xlsm"                # Include all .xlsm files
+      - "*.xlsx"                    # Include .xlsx files in root
+      - "*.xlsm"                    # Include .xlsm files in root
+      - "**/*.xlsx"                 # Include .xlsx files in subdirectories
+      - "**/*.xlsm"                 # Include .xlsm files in subdirectories
     exclude_patterns:
-      - "**/~$*"                   # Exclude Excel temp files
-      - "**/.~lock.*"              # Exclude LibreOffice lock files
-      - "**/archive/**"            # Exclude archive folders
-      - "**/backup/**"             # Exclude backup folders
+      - "**/~$*"                    # Exclude Excel temp files
+      - "**/.~lock.*"               # Exclude LibreOffice lock files
+      - "**/archive/**"             # Exclude archive folders
+      - "**/backup/**"              # Exclude backup folders
 
 destination:
   implementation: local_folder
   config:
-    folder_path: ./output         # Output directory (will be created)
+    folder_path: ./tmp/output           # Output directory (will be created)
 
 converter:
   implementation: noop             # No conversion by default

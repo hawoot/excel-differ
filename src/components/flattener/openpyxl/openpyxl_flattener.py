@@ -60,18 +60,14 @@ class OpenpyxlFlattener(FlattenerInterface):
     def flatten(
         self,
         excel_file: Path,
-        origin_repo: Optional[str] = None,
-        origin_path: Optional[str] = None,
-        origin_commit: Optional[str] = None
+        origin: Optional[str] = None,
     ) -> FlattenResult:
         """
         Flatten Excel file to text representation.
 
         Args:
             excel_file: Path to Excel file
-            origin_repo: Git repository URL (optional, for traceability)
-            origin_path: Path in repository (optional, for traceability)
-            origin_commit: Git commit SHA (optional, for traceability)
+            origin: Git repository URL (optional, for traceability)
 
         Returns:
             FlattenResult with success status and output paths
@@ -81,10 +77,7 @@ class OpenpyxlFlattener(FlattenerInterface):
             # Note: The underlying flattener's flatten() returns Path (flat_root)
             flat_root = self.flattener.flatten(
                 excel_file=excel_file,
-                origin_repo=origin_repo,
-                origin_path=origin_path,
-                origin_commit=origin_commit,
-                origin_commit_message=None  # Not used currently
+                origin=origin,
             )
 
             # Construct manifest path

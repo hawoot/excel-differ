@@ -77,20 +77,14 @@ class Flattener:
     def flatten(
         self,
         excel_file: Path,
-        origin_repo: Optional[str] = None,
-        origin_path: Optional[str] = None,
-        origin_commit: Optional[str] = None,
-        origin_commit_message: Optional[str] = None
+        origin: Optional[str] = None,
     ) -> Path:
         """
         Flatten an Excel workbook.
 
         Args:
             excel_file: Path to Excel file
-            origin_repo: Git repository URL (optional)
-            origin_path: Path in repository (optional)
-            origin_commit: Git commit SHA (optional)
-            origin_commit_message: Commit message (optional)
+            origin: Git repository URL (optional)
 
         Returns:
             Path to flat root directory
@@ -134,12 +128,9 @@ class Flattener:
                 )
 
                 # Set origin if provided
-                if origin_repo or origin_path or origin_commit:
+                if origin:
                     manifest.set_origin(
-                        origin_repo=origin_repo,
-                        origin_path=origin_path,
-                        origin_commit=origin_commit,
-                        origin_commit_message=origin_commit_message
+                        origin=origin,
                     )
 
                 # Load workbook

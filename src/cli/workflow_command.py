@@ -8,8 +8,6 @@ import sys
 from pathlib import Path
 import click
 
-from src.workflows.loader import load_workflow
-
 
 @click.command('workflow')
 @click.argument(
@@ -54,51 +52,51 @@ def workflow_command(config_file):
             click.echo(f"  Looking in: {config_file.absolute()}", err=True)
         sys.exit(1)
 
-    # Load workflow
+    # Create orchestrator from config
+    from src.orchestrator.factory import create_orchestrator_from_config
+
     try:
-        workflow = load_workflow(config_file)
+        click.echo("Creating components...")
+        orchestrator, workflow = create_orchestrator_from_config(config_file)
+
+        # Display workflow info
+        click.echo(f"\nWorkflow Configuration:")
+        click.echo(f"  Source: {workflow.source.implementation}")
+        click.echo(f"  Destination: {workflow.destination.implementation}")
+        click.echo(f"  Converter: {workflow.converter.implementation}")
+        click.echo(f"  Flattener: {workflow.flattener.implementation}")
+        click.echo()
+
+        # Run orchestrator
+        click.echo("Running workflow...\n")
+        result = orchestrator.run()
+
+        # Display results
+        click.echo(f"\n{'='*60}")
+        click.echo(f"✓ Workflow complete!")
+        click.echo(f"{'='*60}")
+        click.echo(f"  Files processed: {result.files_processed}")
+        click.echo(f"  Files succeeded: {result.files_succeeded}")
+        click.echo(f"  Files failed: {result.files_failed}")
+
+        if result.errors:
+            click.echo(f"\n  Errors:")
+            for error in result.errors:
+                click.echo(f"    - {error}")
+
+        # Show details for failed files
+        if result.files_failed > 0:
+            click.echo(f"\n  Failed files:")
+            for proc_result in result.processing_results:
+                if not proc_result.success:
+                    click.echo(f"    - {proc_result.input_file}")
+                    for error in proc_result.errors:
+                        click.echo(f"        {error}")
+
+        sys.exit(0 if result.files_failed == 0 else 1)
+
     except Exception as e:
-        click.echo(f"\n✗ Failed to load workflow: {e}", err=True)
+        click.echo(f"\n✗ Workflow failed: {e}", err=True)
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
-
-    # Display workflow info
-    click.echo(f"\nWorkflow Configuration:")
-    click.echo(f"  Source: {workflow.source.implementation}")
-    click.echo(f"  Destination: {workflow.destination.implementation}")
-    click.echo(f"  Converter: {workflow.converter.implementation}")
-    click.echo(f"  Flattener: {workflow.flattener.implementation}")
-    click.echo()
-
-    # TODO: Create and run orchestrator
-    # For now, just show that the workflow loaded successfully
-    click.echo("✓ Workflow loaded successfully!")
-    click.echo()
-    click.echo("NOTE: Orchestrator not yet implemented.")
-    click.echo("      This will be completed in the next phase.")
-    click.echo()
-    click.echo("To implement:")
-    click.echo("  1. Create Orchestrator class")
-    click.echo("  2. Implement source/destination components")
-    click.echo("  3. Wire everything together")
-
-    sys.exit(0)
-
-    # Future implementation:
-    # from src.orchestrator import Orchestrator
-    # from src.registry import registry
-    #
-    # # Create component instances
-    # source = registry.create_source(workflow.source.implementation, workflow.source.config)
-    # destination = registry.create_destination(workflow.destination.implementation, workflow.destination.config)
-    # converter = registry.create_converter(workflow.converter.implementation, workflow.converter.config)
-    # flattener = registry.create_flattener(workflow.flattener.implementation, workflow.flattener.config)
-    #
-    # # Create and run orchestrator
-    # orchestrator = Orchestrator(source, destination, converter, flattener, workflow)
-    # result = orchestrator.run()
-    #
-    # # Display results
-    # click.echo(f"\n✓ Workflow complete!")
-    # click.echo(f"  Files processed: {result.files_processed}")
-    # click.echo(f"  Files succeeded: {result.files_succeeded}")
-    # click.echo(f"  Files failed: {result.files_failed}")

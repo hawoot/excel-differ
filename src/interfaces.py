@@ -192,10 +192,7 @@ class SourceInterface(ABC):
     @abstractmethod
     def get_changed_files(
         self,
-        include_patterns: List[str],
-        exclude_patterns: List[str],
         since_version: Optional[str],
-        depth: int
     ) -> List[SourceFileInfo]:
         """
         Get files that have changed.
@@ -313,9 +310,7 @@ class FlattenerInterface(ABC):
     def flatten(
         self,
         excel_file: Path,
-        origin_repo: Optional[str] = None,
-        origin_path: Optional[str] = None,
-        origin_commit: Optional[str] = None
+        origin: Optional[str] = None,
     ) -> FlattenResult:
         """Flatten Excel file to text representation"""
         pass
