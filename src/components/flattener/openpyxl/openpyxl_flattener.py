@@ -32,6 +32,7 @@ class OpenpyxlFlattener(FlattenerInterface):
                 - include_computed: Extract computed values (optional, default: False)
                 - include_literal: Extract literal values (optional, default: True)
                 - include_formats: Extract cell formatting (optional, default: True)
+                - include_origin_file: Include original Excel file in output (optional, default: False)
                 - timeout: Maximum extraction time in seconds (optional, default: 900)
                 - max_file_size_mb: Maximum file size in MB (optional, default: 200)
         """
@@ -42,6 +43,7 @@ class OpenpyxlFlattener(FlattenerInterface):
         include_computed = config.get('include_computed', False)
         include_literal = config.get('include_literal', True)
         include_formats = config.get('include_formats', True)
+        include_origin_file = config.get('include_origin_file', False)
         timeout = config.get('timeout', 900)
         max_file_size_mb = config.get('max_file_size_mb', 200)
 
@@ -51,6 +53,7 @@ class OpenpyxlFlattener(FlattenerInterface):
             include_computed=include_computed,
             include_literal=include_literal,
             include_formats=include_formats,
+            include_origin_file=include_origin_file,
             timeout=timeout,
             max_file_size_mb=max_file_size_mb
         )
