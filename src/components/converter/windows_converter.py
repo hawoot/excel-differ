@@ -7,11 +7,14 @@ using Windows COM automation.
 Requires:
 - Windows operating system
 - Microsoft Excel installed
-- pywin32 package (win32com.client)
+- pywin32 package (win32com.client, pythoncom, pywintypes)
 """
 
 import logging
+import os
 import platform
+import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Optional
@@ -19,6 +22,45 @@ from typing import Optional
 from src.interfaces import ConverterInterface, ConversionResult
 
 logger = logging.getLogger(__name__)
+
+
+def _decode_com_error(hresult: int) -> str:
+    """
+    Decode Excel COM error codes to human-readable messages.
+
+    Args:
+        hresult: COM error code (HRESULT)
+
+    Returns:
+        Human-readable error message
+    """
+    errors = {
+        -2146826072: "Object error (0x800a01a8) - Excel tried to update links/charts/events during automation",
+        -2147024891: "Permission denied - file may be locked by another process",
+        -2147024864: "File sharing violation - file is open elsewhere",
+        -2147024894: "File not found",
+        -2147483647: "Excel busy or crashed (RPC call rejected)",
+        -2147352567: "Exception occurred in Excel",
+    }
+    return errors.get(hresult, f"COM error {hresult:#010x}")
+
+
+def _kill_excel_processes():
+    """
+    Force-kill any hanging Excel processes.
+
+    Uses taskkill on Windows to ensure Excel processes are terminated.
+    """
+    try:
+        if platform.system() == 'Windows':
+            subprocess.run(
+                ['taskkill', '/F', '/IM', 'EXCEL.EXE'],
+                capture_output=True,
+                timeout=5
+            )
+            time.sleep(0.5)
+    except Exception:
+        pass  # Best effort - don't fail if taskkill fails
 
 
 class WindowsExcelConverter(ConverterInterface):
@@ -96,14 +138,46 @@ class WindowsExcelConverter(ConverterInterface):
         if not self.needs_conversion(file_path):
             return False
 
-        # Try to check if Excel is available
-        try:
-            excel = self.win32com.Dispatch("Excel.Application")
-            excel.Quit()
-            return True
-        except Exception as e:
-            logger.debug(f"Excel COM not available: {e}")
-            return False
+        # Try to check if Excel is available (with retry)
+        max_retries = 3
+        for attempt in range(max_retries):
+            excel = None
+            try:
+                import pythoncom
+                pythoncom.CoInitialize()
+
+                try:
+                    excel = self.win32com.Dispatch("Excel.Application")
+                    excel.Quit()
+                    excel = None
+
+                    pythoncom.CoUninitialize()
+                    return True
+
+                except Exception as e:
+                    logger.debug(f"Excel COM check attempt {attempt + 1}/{max_retries} failed: {e}")
+
+                    # Cleanup
+                    if excel is not None:
+                        try:
+                            excel.Quit()
+                        except Exception:
+                            pass
+
+                    # Force cleanup
+                    _kill_excel_processes()
+
+                    pythoncom.CoUninitialize()
+
+                    if attempt < max_retries - 1:
+                        time.sleep(0.5)  # Wait before retry
+
+            except Exception as e:
+                logger.debug(f"Excel COM initialization attempt {attempt + 1}/{max_retries} failed: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(0.5)
+
+        return False
 
     def convert(
         self,
@@ -141,75 +215,152 @@ class WindowsExcelConverter(ConverterInterface):
                 errors=["Cannot convert: Excel not available or not on Windows"]
             )
 
-        excel = None
-        workbook = None
-
-        try:
-            # Determine output path
-            if output_dir:
-                output_dir = Path(output_dir)
-                output_dir.mkdir(parents=True, exist_ok=True)
-                output_path = output_dir / (input_path.stem + '.xlsm')
-            else:
-                output_path = input_path.parent / (input_path.stem + '.xlsm')
-
-            # Start Excel
-            excel = self.win32com.Dispatch("Excel.Application")
-            excel.Visible = False
-            excel.DisplayAlerts = False
-
-            # Open workbook
-            abs_input = str(input_path.absolute())
-            workbook = excel.Workbooks.Open(abs_input)
-
-            # Convert: SaveAs with xlsm format
-            # FileFormat 52 = xlOpenXMLWorkbookMacroEnabled (.xlsm)
-            abs_output = str(output_path.absolute())
-            workbook.SaveAs(abs_output, FileFormat=52)
-
-            # Close workbook
-            workbook.Close(SaveChanges=False)
-            workbook = None
-
-            # Quit Excel
-            excel.Quit()
-            excel = None
-
-            return ConversionResult(
-                success=True,
-                input_path=input_path,
-                output_path=output_path,
-                conversion_performed=True,
-                warnings=[],
-                errors=[]
-            )
-
-        except Exception as e:
-            logger.error(f"Excel COM conversion failed for {input_path.name}: {e}", exc_info=True)
-            error_msg = f"Excel COM conversion failed: {str(e)}"
-
+        # Pre-checks
+        if not input_path.exists():
             return ConversionResult(
                 success=False,
                 input_path=input_path,
                 output_path=None,
                 conversion_performed=False,
                 warnings=[],
-                errors=[error_msg]
+                errors=[f"Input file not found: {input_path}"]
             )
 
-        finally:
-            # Cleanup: ensure Excel is closed
-            try:
-                if workbook is not None:
-                    workbook.Close(SaveChanges=False)
-            except:
-                pass
+        if not os.access(input_path, os.R_OK):
+            return ConversionResult(
+                success=False,
+                input_path=input_path,
+                output_path=None,
+                conversion_performed=False,
+                warnings=[],
+                errors=[f"Input file not readable: {input_path}"]
+            )
+
+        excel = None
+        workbook = None
+
+        try:
+            # Initialize COM
+            import pythoncom
+            import pywintypes
+            pythoncom.CoInitialize()
 
             try:
-                if excel is not None:
-                    excel.Quit()
-            except:
-                pass
+                # Determine output path
+                if output_dir:
+                    output_dir = Path(output_dir)
+                    output_dir.mkdir(parents=True, exist_ok=True)
+                    output_path = output_dir / (input_path.stem + '.xlsm')
+                else:
+                    output_path = input_path.parent / (input_path.stem + '.xlsm')
+
+                # Start Excel with better settings
+                excel = self.win32com.Dispatch("Excel.Application")
+                excel.Visible = False
+                excel.DisplayAlerts = False
+                excel.EnableEvents = False  # Disable events to prevent automation issues
+                excel.AskToUpdateLinks = False  # Don't prompt for links
+                excel.ScreenUpdating = False
+                excel.Calculation = -4135  # xlCalculationManual - prevent auto-calc
+
+                # Open workbook with options to prevent updates
+                abs_input = str(input_path.absolute())
+                workbook = excel.Workbooks.Open(
+                    abs_input,
+                    UpdateLinks=0,  # Don't update external links
+                    ReadOnly=False,
+                    IgnoreReadOnlyRecommended=True,
+                    Notify=False
+                )
+
+                # Convert: SaveAs with xlsm format
+                # FileFormat 52 = xlOpenXMLWorkbookMacroEnabled (.xlsm)
+                abs_output = str(output_path.absolute())
+                workbook.SaveAs(abs_output, FileFormat=52)
+
+                # Close workbook
+                workbook.Close(SaveChanges=False)
+                workbook = None
+
+                # Quit Excel
+                excel.Quit()
+                excel = None
+
+                logger.info(f"Successfully converted {input_path.name} to {output_path.name}")
+
+                return ConversionResult(
+                    success=True,
+                    input_path=input_path,
+                    output_path=output_path,
+                    conversion_performed=True,
+                    warnings=[],
+                    errors=[]
+                )
+
+            except pywintypes.com_error as e:
+                hresult = e.args[0] if e.args else 0
+                error_msg = _decode_com_error(hresult)
+                logger.error(
+                    f"Excel COM conversion failed for {input_path.name}: {error_msg}",
+                    exc_info=True
+                )
+                return ConversionResult(
+                    success=False,
+                    input_path=input_path,
+                    output_path=None,
+                    conversion_performed=False,
+                    warnings=[],
+                    errors=[f"Excel COM error: {error_msg}"]
+                )
+
+            except Exception as e:
+                logger.error(
+                    f"Excel conversion failed for {input_path.name}: {e}",
+                    exc_info=True
+                )
+                return ConversionResult(
+                    success=False,
+                    input_path=input_path,
+                    output_path=None,
+                    conversion_performed=False,
+                    warnings=[],
+                    errors=[f"Conversion failed: {str(e)}"]
+                )
+
+            finally:
+                # Cleanup: ensure Excel is closed
+                try:
+                    if workbook is not None:
+                        workbook.Close(SaveChanges=False)
+                except Exception:
+                    pass
+
+                try:
+                    if excel is not None:
+                        excel.Quit()
+                except Exception:
+                    pass
+
+                # Force cleanup - kill any hanging Excel processes
+                _kill_excel_processes()
+
+                # Uninitialize COM
+                try:
+                    pythoncom.CoUninitialize()
+                except Exception:
+                    pass
+
+        except Exception as e:
+            # Catch any errors from COM initialization itself
+            logger.error(f"COM initialization failed: {e}", exc_info=True)
+            return ConversionResult(
+                success=False,
+                input_path=input_path,
+                output_path=None,
+                conversion_performed=False,
+                warnings=[],
+                errors=[f"COM initialization failed: {str(e)}"]
+            )
 
     def get_name(self) -> str:
         """Return name of this converter implementation"""
