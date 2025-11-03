@@ -55,20 +55,25 @@ def workflow_command(config_file):
             click.echo(f"  Looking in: {config_file.absolute()}", err=True)
         sys.exit(1)
 
-    # Create orchestrator from config
+    # Load workflow config and initialize logging BEFORE creating components
+    from src.workflows.loader import load_workflow
     from src.orchestrator.factory import create_orchestrator_from_config
 
     try:
-        click.echo("Creating components...")
-        orchestrator, workflow = create_orchestrator_from_config(config_file)
+        # Step 1: Load workflow definition (just parse YAML)
+        workflow = load_workflow(config_file)
 
-        # Initialize logging from workflow config
+        # Step 2: Initialize logging BEFORE creating components
         log_level = workflow.logging.log_level.upper()
         setup_logging(
             log_level=log_level,
             log_dir=workflow.logging.log_dir,
             component='excel-differ-workflow-command'
         )
+
+        # Step 3: Now create components (with logging already configured)
+        click.echo("Creating components...")
+        orchestrator, workflow = create_orchestrator_from_config(config_file)
 
         # Display workflow info
         click.echo(f"\nWorkflow Configuration:")

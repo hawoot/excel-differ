@@ -7,6 +7,7 @@ text representation of an Excel workbook.
 import logging
 import shutil
 import threading
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -239,11 +240,14 @@ class Flattener:
         """
         try:
             # Load with data_only=False to get formulas
-            wb = load_workbook(
-                filename=str(file_path),
-                data_only=False,
-                keep_vba=False  # VBA extracted separately with oletools
-            )
+            # Suppress openpyxl warnings about unsupported features (conditional formatting, etc.)
+            with warnings.catch_warnings():
+                warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
+                wb = load_workbook(
+                    filename=str(file_path),
+                    data_only=False,
+                    keep_vba=False  # VBA extracted separately with oletools
+                )
             logger.info(f"✓ Workbook loaded ({len(wb.worksheets)} sheets)")
             return wb
 

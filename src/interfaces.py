@@ -180,16 +180,6 @@ class SourceInterface(ABC):
         self.config = config
 
     @abstractmethod
-    def get_sync_state(self) -> SourceSyncState:
-        """
-        Get last synchronisation state.
-
-        Reads state file from destination (written in previous run).
-        Returns state with last_processed_version=None if first run.
-        """
-        pass
-
-    @abstractmethod
     def get_changed_files(
         self,
         since_version: Optional[str],
@@ -198,13 +188,10 @@ class SourceInterface(ABC):
         Get files that have changed.
 
         Args:
-            include_patterns: Glob patterns to include
-            exclude_patterns: Glob patterns to exclude
-            since_version: Get changes since this version (if None, use depth)
-            depth: How many versions back if since_version is None
-                   0 = return empty list
-                   1 = only latest version
-                   N = last N versions
+            since_version: Get changes since this version (if None, use depth parameter from config)
+
+        Note: State management is now handled by StateManager class.
+        Sources no longer manage state directly.
         """
         pass
 
@@ -235,11 +222,6 @@ class DestinationInterface(ABC):
     def __init__(self, config: dict):
         """Initialize destination with configuration"""
         self.config = config
-
-    @abstractmethod
-    def save_sync_state(self, state: SourceSyncState) -> None:
-        """Save synchronisation state to destination"""
-        pass
 
     @abstractmethod
     def upload_file(

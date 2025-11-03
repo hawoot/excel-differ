@@ -2,9 +2,9 @@
 BitbucketSource - Read Excel files from Bitbucket repository
 
 Minimal implementation - uses client for all HTTP operations.
+State management handled by StateManager.
 """
 
-import json
 import logging
 from pathlib import Path
 from datetime import datetime
@@ -12,7 +12,6 @@ from typing import List, Optional
 
 from src.interfaces import (
     SourceInterface,
-    SourceSyncState,
     SourceFileInfo,
     DownloadResult
 )
@@ -40,7 +39,7 @@ class BitbucketSource(SourceInterface):
                 - include_patterns: List of glob patterns to include (optional)
                 - exclude_patterns: List of glob patterns to exclude (optional)
                 - depth: Number of commits to process initially (optional, default: 1)
-                - state_file_path: Path to state file (injected by factory)
+                - download_dir: Directory where files will be downloaded (optional, default: ./tmp/downloads)
         """
         super().__init__(config)
         self.url = config['url']
@@ -48,45 +47,12 @@ class BitbucketSource(SourceInterface):
         self.include_patterns = config.get('include_patterns', ['**/*.xlsx', '**/*.xlsm'])
         self.exclude_patterns = config.get('exclude_patterns', [])
         self.depth = config.get('depth', 1)
-
-        # State file path (injected by factory from workflow definition)
-        self.state_file = Path(config.get('state_file_path', './.excel-differ-state.json'))
+        self.download_dir = Path(config.get('download_dir', './tmp/downloads'))
 
         # Initialize client - it gets token from environment automatically
         self.client = BitbucketClient(base_url=self.url)
 
-        logger.info(f"Initialized BitbucketSource for {self.url} (branch: {self.branch})")
-
-    def get_sync_state(self) -> SourceSyncState:
-        """Get last synchronisation state from state file."""
-        if not self.state_file.exists():
-            logger.info("No sync state file found - first run")
-            return SourceSyncState(
-                last_processed_version=None,
-                last_processed_date=None
-            )
-
-        try:
-            with open(self.state_file, 'r') as f:
-                state_data = json.load(f)
-
-            last_date = None
-            if state_data.get('last_processed_date'):
-                last_date = datetime.fromisoformat(state_data['last_processed_date'])
-
-            logger.info(f"Loaded sync state: last_version={state_data.get('last_processed_version')}")
-
-            return SourceSyncState(
-                last_processed_version=state_data.get('last_processed_version'),
-                last_processed_date=last_date
-            )
-
-        except Exception as e:
-            logger.warning(f"Error reading state file: {e}. Treating as first run.")
-            return SourceSyncState(
-                last_processed_version=None,
-                last_processed_date=None
-            )
+        logger.info(f"Initialized BitbucketSource for {self.url} (branch: {self.branch}, download_dir: {self.download_dir})")
 
     def get_changed_files(
         self,
@@ -130,6 +96,10 @@ class BitbucketSource(SourceInterface):
                 # Just use the first N commits (depth)
                 commits = all_commits[:self.depth]
                 logger.info(f"Processing last {len(commits)} commit(s)")
+
+            # Reverse to process EARLIEST-FIRST (Monday → Tuesday → Wednesday)
+            # This ensures chronological ordering for diffs
+            commits.reverse()
 
             if not commits:
                 logger.info("No new commits to process")
@@ -197,7 +167,8 @@ class BitbucketSource(SourceInterface):
             logger.info(f"Downloading {source_path} at version {version}")
 
             # Download using client (use branch name as ref for now)
-            content = self.client.get_file(path=source_path, ref=self.branch)
+            source_path_normanalised = source_path.replace('\\', '/')
+            content = self.client.get_file(path=source_path_normanalised, ref=self.branch)
 
             # Create parent directory if needed
             local_dest.parent.mkdir(parents=True, exist_ok=True)
@@ -206,7 +177,7 @@ class BitbucketSource(SourceInterface):
             with open(local_dest, 'wb') as f:
                 f.write(content)
 
-            logger.info(f"Successfully downloaded {source_path} ({len(content)} bytes)")
+            logger.info(f"Successfully downloaded {local_dest} ({len(content)} bytes)")
 
             return DownloadResult(
                 success=True,

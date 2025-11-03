@@ -147,7 +147,8 @@ class WindowsExcelConverter(ConverterInterface):
                 pythoncom.CoInitialize()
 
                 try:
-                    excel = self.win32com.Dispatch("Excel.Application")
+                    # Use DispatchEx to create NEW Excel instance (not reuse existing)
+                    excel = self.win32com.DispatchEx("Excel.Application")
                     excel.Quit()
                     excel = None
 
@@ -254,26 +255,28 @@ class WindowsExcelConverter(ConverterInterface):
                 else:
                     output_path = input_path.parent / (input_path.stem + '.xlsm')
 
-                # Start Excel - minimal settings only
-                excel = self.win32com.Dispatch("Excel.Application")
+                # Start NEW Excel instance (DispatchEx creates isolated instance)
+                # This ensures each conversion has its own Excel app - completely hermetic
+                excel = self.win32com.DispatchEx("Excel.Application")
 
-                # Try to set Visible to False
+                # Non-critical: Try to set Visible to False
                 try:
                     excel.Visible = False
-                except Exception:
-                    pass  # If even this fails, continue anyway
+                except:
+                    pass  # Ignore errors - not critical
 
-                # Only set DisplayAlerts - this is the most reliable property
+                # Non-critical: Set DisplayAlerts
                 try:
                     excel.DisplayAlerts = False
-                except Exception:
-                    pass  # If even this fails, continue anyway
-                
+                except:
+                    pass  # Ignore errors - not critical
+
+                # Non-critical: Disable events and updates
                 try:
                     excel.EnableEvents = False  # Disable events to prevent automation issues
                     excel.AskToUpdateLinks = False  # Don't prompt for links
                     excel.ScreenUpdating = False
-                except Exception:
+                except:
                     pass
                 # Open workbook - minimal options
                 abs_input = str(input_path.absolute())
@@ -284,18 +287,18 @@ class WindowsExcelConverter(ConverterInterface):
                 abs_output = str(output_path.absolute())
                 workbook.SaveAs(abs_output, FileFormat=52)
 
-                # Close workbook
+                # Non-critical: Close workbook
                 try:
                     workbook.Close(SaveChanges=False)
-                except Exception:
-                    pass
+                except:
+                    pass  # Ignore errors - not critical
                 workbook = None
 
-                # Quit Excel
+                # Non-critical: Quit Excel
                 try:
                     excel.Quit()
-                except Exception:
-                    pass
+                except:
+                    pass  # Ignore errors - not critical
                 excel = None
 
                 logger.info(f"Successfully converted {input_path.name} to {output_path.name}")
@@ -340,27 +343,30 @@ class WindowsExcelConverter(ConverterInterface):
                 )
 
             finally:
-                # Cleanup: ensure Excel is closed
+                # Non-critical cleanup: Ensure Excel is closed
                 try:
                     if workbook is not None:
                         workbook.Close(SaveChanges=False)
-                except Exception:
-                    pass
+                except:
+                    pass  # Ignore errors - best effort cleanup
 
                 try:
                     if excel is not None:
                         excel.Quit()
-                except Exception:
-                    pass
+                except:
+                    pass  # Ignore errors - best effort cleanup
 
-                # Force cleanup - kill any hanging Excel processes
-                _kill_excel_processes()
+                # Non-critical: Force cleanup - kill any hanging Excel processes
+                try:
+                    _kill_excel_processes()
+                except:
+                    pass  # Ignore errors - best effort cleanup
 
-                # Uninitialize COM
+                # Non-critical: Uninitialize COM
                 try:
                     pythoncom.CoUninitialize()
-                except Exception:
-                    pass
+                except:
+                    pass  # Ignore errors - best effort cleanup
 
         except Exception as e:
             # Catch any errors from COM initialization itself

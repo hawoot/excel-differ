@@ -2,16 +2,14 @@
 LocalDestination - Save files to local folder
 
 Simple destination that writes files to a local directory.
-Maintains sync state in configured state file.
+State management handled by StateManager.
 """
 
-import json
 import shutil
 from pathlib import Path
-from datetime import datetime
 from typing import List
 
-from src.interfaces import DestinationInterface, SourceSyncState, UploadResult
+from src.interfaces import DestinationInterface, UploadResult
 
 
 class LocalDestination(DestinationInterface):
@@ -28,34 +26,12 @@ class LocalDestination(DestinationInterface):
         Args:
             config: Configuration dict with:
                 - folder_path: Destination folder path (required)
-                - state_file_path: Path to state file (injected by factory)
         """
         super().__init__(config)
         self.folder_path = Path(config['folder_path'])
-        self.state_file = Path(config.get('state_file_path', './.excel-differ-state.json'))
 
         # Create destination folder if it doesn't exist
         self.folder_path.mkdir(parents=True, exist_ok=True)
-
-        # Create state file parent directory if it doesn't exist
-        self.state_file.parent.mkdir(parents=True, exist_ok=True)
-
-    def save_sync_state(self, state: SourceSyncState) -> None:
-        """
-        Save synchronisation state.
-
-        Writes state file with last processed version and date.
-
-        Args:
-            state: SourceSyncState to save
-        """
-        state_data = {
-            'last_processed_version': state.last_processed_version,
-            'last_processed_date': state.last_processed_date.isoformat() if state.last_processed_date else None
-        }
-
-        with open(self.state_file, 'w') as f:
-            json.dump(state_data, f, indent=2)
 
     def upload_file(
         self,

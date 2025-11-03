@@ -3,9 +3,9 @@ LocalSource - Read Excel files from local folder
 
 Simple source that scans a local directory for Excel files.
 Tracks changes using file modification timestamps.
+State management handled by StateManager.
 """
 
-import json
 import shutil
 from pathlib import Path
 from datetime import datetime
@@ -14,7 +14,6 @@ from fnmatch import fnmatch
 
 from src.interfaces import (
     SourceInterface,
-    SourceSyncState,
     SourceFileInfo,
     DownloadResult
 )
@@ -37,55 +36,14 @@ class LocalSource(SourceInterface):
                 - folder_path: Source folder path (required)
                 - include_patterns: List of glob patterns to include (optional)
                 - exclude_patterns: List of glob patterns to exclude (optional)
-                - state_file_path: Path to state file (injected by factory)
         """
         super().__init__(config)
         self.folder_path = Path(config['folder_path'])
         self.include_patterns = config.get('include_patterns', ['*.xlsx', '*.xlsm', '**/*.xlsx', '**/*.xlsm'])
         self.exclude_patterns = config.get('exclude_patterns', [])
 
-        # State file path (injected by factory from workflow definition)
-        self.state_file = Path(config.get('state_file_path', './.excel-differ-state.json'))
-
         if not self.folder_path.exists():
             raise ValueError(f"Source folder does not exist: {self.folder_path}")
-
-    def get_sync_state(self) -> SourceSyncState:
-        """
-        Get last synchronisation state.
-
-        Reads state file from configured path.
-
-        Returns:
-            SourceSyncState with last processed version and date,
-            or None values if first run
-        """
-        if not self.state_file.exists():
-            # First run - no state file
-            return SourceSyncState(
-                last_processed_version=None,
-                last_processed_date=None
-            )
-
-        try:
-            with open(self.state_file, 'r') as f:
-                state_data = json.load(f)
-
-            last_date = None
-            if state_data.get('last_processed_date'):
-                last_date = datetime.fromisoformat(state_data['last_processed_date'])
-
-            return SourceSyncState(
-                last_processed_version=state_data.get('last_processed_version'),
-                last_processed_date=last_date
-            )
-
-        except Exception as e:
-            # Error reading state - treat as first run
-            return SourceSyncState(
-                last_processed_version=None,
-                last_processed_date=None
-            )
 
     def get_changed_files(
         self,

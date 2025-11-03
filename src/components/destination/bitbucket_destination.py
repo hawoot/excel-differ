@@ -2,15 +2,14 @@
 BitbucketDestination - Upload files to Bitbucket repository
 
 Minimal implementation - uses client for all HTTP operations.
+State management handled by StateManager.
 """
 
-import json
 import logging
 from pathlib import Path
-from datetime import datetime
 from typing import List
 
-from src.interfaces import DestinationInterface, SourceSyncState, UploadResult
+from src.interfaces import DestinationInterface, UploadResult
 from src.utils.bitbucket_client import BitbucketClient
 
 
@@ -33,16 +32,11 @@ class BitbucketDestination(DestinationInterface):
                 - url: Full API base URL (e.g., https://api.bitbucket.org/2.0/repositories/workspace/repo)
                 - branch: Branch name (required)
                 - output_path: Where to upload in repo (optional, default: "")
-                - state_file_path: Path to state file (injected by factory)
         """
         super().__init__(config)
         self.url = config['url']
         self.branch = config['branch']
         self.output_path = config.get('output_path', '').strip('/')
-
-        # State file path (injected by factory from workflow definition)
-        self.state_file = Path(config.get('state_file_path', './.excel-differ-state.json'))
-        self.state_file_name = self.state_file.name
 
         # Initialize client - it gets token from environment automatically
         self.client = BitbucketClient(base_url=self.url)
@@ -51,37 +45,6 @@ class BitbucketDestination(DestinationInterface):
             f"Initialized BitbucketDestination for {self.url} "
             f"(branch: {self.branch}, output_path: {self.output_path or 'root'})"
         )
-
-    def save_sync_state(self, state: SourceSyncState) -> None:
-        """Save synchronisation state by uploading state file."""
-        state_data = {
-            'last_processed_version': state.last_processed_version,
-            'last_processed_date': state.last_processed_date.isoformat() if state.last_processed_date else None
-        }
-
-        try:
-            # Write state to local file first
-            self.state_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.state_file, 'w') as f:
-                json.dump(state_data, f, indent=2)
-
-            # Upload to repository using client
-            with open(self.state_file, 'rb') as f:
-                state_content = f.read()
-
-            # Determine path in repository
-            repo_path = f"{self.output_path}/{self.state_file_name}" if self.output_path else self.state_file_name
-
-            # Upload using client
-            files = {repo_path: (repo_path, state_content)}
-            message = f'Update sync state: {state.last_processed_version}'
-            self.client.upload_files(branch=self.branch, files=files, message=message)
-
-            logger.info(f"Saved sync state to {repo_path}")
-
-        except Exception as e:
-            logger.error(f"Error saving sync state: {e}")
-            raise
 
     def upload_file(
         self,

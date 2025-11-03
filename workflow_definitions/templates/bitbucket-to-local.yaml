@@ -15,6 +15,7 @@ source:
   config:
     url: https://api.bitbucket.org/2.0/repositories/myworkspace/my-repo
     branch: main
+    download_dir: ./tmp/downloads     # Where Bitbucket files are downloaded
     include_patterns:
       - "data/**/*.xlsx"
       - "reports/**/*.xlsm"

@@ -10,6 +10,7 @@ from typing import Tuple
 from src.workflows.loader import load_workflow
 from src.workflows.schema import WorkflowDefinition
 from src.registry import registry
+from src.utils.state_manager import StateManager
 from .orchestrator import Orchestrator
 
 
@@ -19,11 +20,9 @@ def create_orchestrator_from_config(config_file: Path) -> Tuple[Orchestrator, Wo
 
     This is the centralized factory for building orchestrators. It handles:
     1. Loading the workflow definition from YAML
-    2. Creating all component instances from the registry
-    3. Building and returning the orchestrator
-
-    The orchestrator gets its configuration (patterns, depth, etc.) directly
-    from the source component - no need to pass config around.
+    2. Creating StateManager instance
+    3. Creating all component instances from the registry
+    4. Building and returning the orchestrator with StateManager
 
     Args:
         config_file: Path to workflow YAML config file
@@ -44,22 +43,19 @@ def create_orchestrator_from_config(config_file: Path) -> Tuple[Orchestrator, Wo
     # Load workflow definition
     workflow = load_workflow(config_file)
 
-    # Inject state file path into source and destination configs
-    source_config = workflow.source.config.copy()
-    source_config['state_file_path'] = workflow.state.file_path
-
-    destination_config = workflow.destination.config.copy()
-    destination_config['state_file_path'] = workflow.state.file_path
+    # Create StateManager (centralized state management)
+    state_manager = StateManager(workflow.state.file_path)
 
     # Create component instances from workflow definition
+    # Note: No state_file_path injection - StateManager handles all state
     source = registry.create_source(
         workflow.source.implementation,
-        source_config
+        workflow.source.config
     )
 
     destination = registry.create_destination(
         workflow.destination.implementation,
-        destination_config
+        workflow.destination.config
     )
 
     converter = registry.create_converter(
@@ -72,13 +68,13 @@ def create_orchestrator_from_config(config_file: Path) -> Tuple[Orchestrator, Wo
         workflow.flattener.config
     )
 
-    # Create orchestrator
-    # Note: Orchestrator gets patterns/depth directly from source component
+    # Create orchestrator with StateManager
     orchestrator = Orchestrator(
         source=source,
         destination=destination,
         converter=converter,
-        flattener=flattener
+        flattener=flattener,
+        state_manager=state_manager
     )
 
     return orchestrator, workflow

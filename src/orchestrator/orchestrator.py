@@ -6,6 +6,7 @@ Orchestrates the Excel Differ workflow by coordinating:
 2. Converter - Convert if needed
 3. Flattener - Flatten to text
 4. Destination - Upload results
+5. StateManager - Per-file state tracking
 """
 
 import logging
@@ -20,9 +21,9 @@ from src.interfaces import (
     ConverterInterface,
     FlattenerInterface,
     WorkflowResult,
-    ProcessingResult,
-    SourceSyncState
+    ProcessingResult
 )
+from src.utils.state_manager import StateManager
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +32,8 @@ class Orchestrator:
     """
     Workflow orchestrator.
 
-    Coordinates source, converter, flattener, and destination components
-    to process Excel files through the complete pipeline.
+    Coordinates source, converter, flattener, destination, and state manager
+    to process Excel files through the complete pipeline with per-file state tracking.
     """
 
     def __init__(
@@ -40,7 +41,8 @@ class Orchestrator:
         source: SourceInterface,
         destination: DestinationInterface,
         converter: ConverterInterface,
-        flattener: FlattenerInterface
+        flattener: FlattenerInterface,
+        state_manager: StateManager
     ):
         """
         Initialize orchestrator with all components.
@@ -50,25 +52,28 @@ class Orchestrator:
             destination: Destination component
             converter: Converter component
             flattener: Flattener component
+            state_manager: StateManager for per-file state tracking
         """
         self.source = source
         self.destination = destination
         self.converter = converter
         self.flattener = flattener
+        self.state_manager = state_manager
 
     def run(self) -> WorkflowResult:
         """
-        Run the complete workflow.
+        Run the complete workflow with per-file state tracking.
 
         Workflow steps:
-        1. Get sync state from destination
-        2. Get changed files from source
-        3. For each file:
-           a. Download from source
-           b. Convert if needed
-           c. Flatten
-           d. Upload to destination
-        4. Save new sync state
+        1. Get changed files from source (using depth parameter for new files)
+        2. For each file:
+           a. Check if should process (based on per-file state)
+           b. If yes:
+              - Download from source
+              - Convert if needed
+              - Flatten
+              - Upload to destination
+              - Update file state immediately (success or failure)
 
         Returns:
             WorkflowResult with statistics and any errors
@@ -77,18 +82,12 @@ class Orchestrator:
         errors = []
 
         try:
-            # Step 1: Get sync state
-            logger.info("Getting sync state...")
-            sync_state = self.source.get_sync_state()
-            logger.info(f"Last processed version: {sync_state.last_processed_version}")
+            # Step 1: Get changed files from source
+            # Note: source uses None for since_version (will use depth parameter)
+            logger.info("Getting changed files from source...")
+            changed_files = self.source.get_changed_files(since_version=None)
 
-            # Step 2: Get changed files
-            logger.info("Getting changed files...")
-            changed_files = self.source.get_changed_files(
-                since_version=sync_state.last_processed_version,
-            )
-
-            logger.info(f"Found {len(changed_files)} file(s) to process")
+            logger.info(f"Found {len(changed_files)} file(s) from source")
 
             if not changed_files:
                 logger.info("No files to process")
@@ -100,19 +99,27 @@ class Orchestrator:
                     errors=[]
                 )
 
-            # Step 3: Process each file
+            # Step 2: Process each file (with per-file state checking)
             for file_info in changed_files:
+                file_path = str(file_info.path)
+
+                # Check if file should be processed based on state
+                if not self.state_manager.should_process_file(file_path, file_info.version):
+                    logger.info(f"Skipping {file_path} (already processed at version {file_info.version})")
+                    continue
+
+                # Process file
                 result = self._process_file(file_info)
                 processing_results.append(result)
 
-            # Step 4: Save new sync state
-            new_version = self.source.get_current_version()
-            new_sync_state = SourceSyncState(
-                last_processed_version=new_version,
-                last_processed_date=file_info.version_date  # Use last file's date
-            )
-            self.destination.save_sync_state(new_sync_state)
-            logger.info(f"Saved sync state: {new_version}")
+                # Update state immediately after processing (per-file)
+                error_msg = None if result.success else (result.errors[0] if result.errors else "Unknown error")
+                self.state_manager.update_file_state(
+                    file_path=file_path,
+                    success=result.success,
+                    version=file_info.version,
+                    error=error_msg
+                )
 
         except Exception as e:
             logger.error(f"Workflow failed: {e}", exc_info=True)

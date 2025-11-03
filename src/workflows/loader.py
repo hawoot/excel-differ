@@ -152,7 +152,8 @@ def load_workflow(yaml_path: Path) -> WorkflowDefinition:
         logging_spec = None
         if 'logging' in data:
             logging_spec = LoggingSpec(
-                log_dir=data['logging'].get('log_dir', './logs')
+                log_dir=data['logging'].get('log_dir', './logs'),
+                log_level=data['logging'].get('log_level', 'INFO')
             )
 
         workflow = WorkflowDefinition(
