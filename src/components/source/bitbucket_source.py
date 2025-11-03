@@ -96,8 +96,8 @@ class BitbucketSource(SourceInterface):
         Get files that have changed.
 
         For Bitbucket source:
-        - Version = commit SHA
-        - If since_version: Return files changed in commits after that SHA
+        - Version = timestamp
+        - If since_version: Return files changed in commits after that timestamp
         - If since_version is None: Return files changed in last N commits (depth)
         - If depth = 0: Return empty list
         """
@@ -107,34 +107,75 @@ class BitbucketSource(SourceInterface):
                 return []
 
             # Get commits using client
+            # Fetch more commits than depth to ensure we get enough after filtering
+            limit = 10 if since_version else self.depth
+            data = self.client.get_commits(branch=self.branch, limit=limit)
+
+            all_commits = data.get('values', [])
+            if not all_commits:
+                logger.info("No commits found")
+                return []
+
+            # Filter commits by timestamp if since_version is provided
+            commits = []
             if since_version:
-                logger.info(f"Fetching commits since {since_version}")
-                data = self.client.get_commits(branch=self.branch, exclude=since_version)
-            elif self.depth > 0:
-                logger.info(f"Fetching last {self.depth} commit(s)")
-                data = self.client.get_commits(branch=self.branch, pagelen=self.depth)
+                logger.info(f"Filtering commits since timestamp {since_version}")
+                since_timestamp = int(since_version)
+                for commit in all_commits:
+                    commit_timestamp = int(commit['authorTimestamp'])
+                    if commit_timestamp > since_timestamp:
+                        commits.append(commit)
+                logger.info(f"Found {len(commits)} commits after timestamp {since_version}")
             else:
-                return []
+                # Just use the first N commits (depth)
+                commits = all_commits[:self.depth]
+                logger.info(f"Processing last {len(commits)} commit(s)")
 
-            commits = data.get('values', [])
             if not commits:
-                logger.info("No commits found to process")
+                logger.info("No new commits to process")
                 return []
-
-            logger.info(f"Processing {len(commits)} commit(s)")
 
             # Collect changed files from all commits
             changed_files = {}  # path -> SourceFileInfo (deduplicate by path)
 
             for commit in commits:
-                commit_sha = commit['hash']
-                commit_date_str = commit['date']
-                commit_date = datetime.fromisoformat(commit_date_str.replace('Z', '+00:00'))
+                commit_id = commit['id']
+                commit_timestamp = commit['authorTimestamp']
+                commit_date = datetime.fromtimestamp(commit_timestamp / 1000)  # Convert ms to seconds
 
-                logger.debug(f"Processing commit {commit_sha[:8]}")
+                logger.debug(f"Processing commit {commit['message'][:50]}")
 
-                # TODO: Implement proper file listing when needed
-                # For now, just return empty - user said keep it minimal
+                # Get files changed in this commit
+                try:
+                    changes = self.client.get_commit_changes(commit_id)
+
+                    for change in changes.get('values', []):
+                        file_path = change['path']['toString']
+                        path_obj = Path(file_path)
+
+                        # Check if file matches include patterns
+                        included = any(path_obj.match(pattern) for pattern in self.include_patterns)
+                        if not included:
+                            continue
+
+                        # Check if file matches exclude patterns
+                        excluded = any(path_obj.match(pattern) for pattern in self.exclude_patterns)
+                        if excluded:
+                            continue
+
+                        # Add to changed files (use latest version if file appears in multiple commits)
+                        if file_path not in changed_files:
+                            changed_files[file_path] = SourceFileInfo(
+                                path=path_obj,
+                                version=str(commit_timestamp),  # Use timestamp as version
+                                version_date=commit_date,
+                                status='modified'
+                            )
+                            logger.debug(f"Found changed file: {file_path}")
+
+                except Exception as e:
+                    logger.warning(f"Error getting changes for commit {commit_id}: {e}")
+                    continue
 
             logger.info(f"Found {len(changed_files)} changed file(s) matching patterns")
             return list(changed_files.values())
@@ -151,10 +192,10 @@ class BitbucketSource(SourceInterface):
     ) -> DownloadResult:
         """Download file from Bitbucket at specific commit."""
         try:
-            logger.info(f"Downloading {source_path} at commit {version[:8]}")
+            logger.info(f"Downloading {source_path} at version {version}")
 
-            # Download using client
-            content = self.client.get_file(path=source_path, ref=version)
+            # Download using client (use branch name as ref for now)
+            content = self.client.get_file(path=source_path, ref=self.branch)
 
             # Create parent directory if needed
             local_dest.parent.mkdir(parents=True, exist_ok=True)
@@ -184,11 +225,11 @@ class BitbucketSource(SourceInterface):
             )
 
     def get_current_version(self) -> str:
-        """Get current version identifier (latest commit SHA on branch)."""
+        """Get current version identifier (latest commit timestamp on branch)."""
         try:
-            commit_sha = self.client.get_branch_head(self.branch)
-            logger.debug(f"Current version: {commit_sha}")
-            return commit_sha
+            commit_timestamp = self.client.get_branch_head_timestamp(self.branch)
+            logger.debug(f"Current version: {commit_timestamp}")
+            return commit_timestamp
         except Exception as e:
             logger.error(f"Error getting current version: {e}")
             # Return timestamp as fallback

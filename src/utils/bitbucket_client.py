@@ -25,7 +25,7 @@ def get_token_from_env(env_var: str = 'BITBUCKET_TOKEN') -> str:
 
 class BitbucketClient:
     """
-    Minimal Bitbucket client - inserts token into URL for auth.
+    Minimal Bitbucket client for Bitbucket Data Center/Server.
     Gets token from BITBUCKET_TOKEN environment variable automatically.
     """
 
@@ -37,45 +37,39 @@ class BitbucketClient:
             base_url: Base API URL (e.g., https://api.bitbucket.org/2.0/repositories/workspace/repo)
         """
         # Get token from environment
-        token = get_token_from_env()
+        self.token = get_token_from_env()
 
-        # Insert token into URL: https://... -> https://{token}@...
         self.base_url = base_url.rstrip('/')
 
-        # Create URL with embedded token
-        if '://' in self.base_url:
-            protocol, rest = self.base_url.split('://', 1)
-            self.base_url_with_token = f"{protocol}://{token}@{rest}"
-        else:
-            self.base_url_with_token = self.base_url
-
-    def get_commits(self, branch: str, exclude: str = None, pagelen: int = None) -> dict:
+    def get_commits(self, branch: str, limit: int = 20) -> dict:
         """Get commits for a branch."""
-        url = f"{self.base_url_with_token}/commits/{branch}"
-        params = {}
-        if exclude:
-            params['exclude'] = exclude
-        if pagelen:
-            params['pagelen'] = pagelen
+        url = f"{self.base_url}/commits"
+        params = {'until': f'refs/heads/{branch}'}
+        if limit:
+            params['limit'] = limit
 
-        response = requests.get(url, params=params)
+        response = requests.get(url, params=params, headers={'Authorization': f'Bearer {self.token}'})
+        response.raise_for_status()
+        return response.json()
+
+    def get_commit_changes(self, commit_id: str) -> dict:
+        """Get files changed in a specific commit."""
+        url = f"{self.base_url}/commits/{commit_id}/changes"
+        response = requests.get(url, headers={'Authorization': f'Bearer {self.token}'})
         response.raise_for_status()
         return response.json()
 
     def get_file(self, path: str, ref: str) -> bytes:
         """Download file content at specific commit."""
-        url = f"{self.base_url_with_token}/src/{ref}/{path}"
-        response = requests.get(url)
+        url = f"{self.base_url}/browse/{path}"
+        response = requests.get(url, params={'at': ref}, headers={'Authorization': f'Bearer {self.token}'})
         response.raise_for_status()
         return response.content
 
-    def get_branch_head(self, branch: str) -> str:
-        """Get latest commit SHA for branch."""
-        url = f"{self.base_url_with_token}/refs/branches/{branch}"
-        response = requests.get(url)
-        response.raise_for_status()
-        data = response.json()
-        return data['target']['hash']
+    def get_branch_head_timestamp(self, branch: str) -> str:
+        """Get latest commit timestamp for branch."""
+        data = self.get_commits(branch, limit=1)
+        return str(data['values'][0]['authorTimestamp'])
 
     def upload_files(self, branch: str, files: dict, message: str) -> dict:
         """
@@ -83,17 +77,28 @@ class BitbucketClient:
 
         Args:
             branch: Branch name
-            files: Dict of {repo_path: (filename, content)}
+            files: Dict of {repo_path: content}
             message: Commit message
 
         Returns:
-            Response JSON
+            Response JSON from last upload
         """
-        url = f"{self.base_url_with_token}/src"
-        data = {
-            'message': message,
-            'branch': branch
-        }
-        response = requests.post(url, data=data, files=files)
-        response.raise_for_status()
-        return response.json()
+        result = None
+        for file_path, content in files.items():
+            url = f"{self.base_url}/browse/{file_path}"
+            data = {
+                'message': message,
+                'branch': branch
+            }
+            files_param = {'content': content}
+
+            response = requests.put(
+                url,
+                data=data,
+                files=files_param,
+                headers={'Authorization': f'Bearer {self.token}'}
+            )
+            response.raise_for_status()
+            result = response.json()
+
+        return result if result else {}

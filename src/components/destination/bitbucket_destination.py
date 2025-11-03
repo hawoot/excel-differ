@@ -99,7 +99,7 @@ class BitbucketDestination(DestinationInterface):
             repo_path = f"{self.output_path}/{remote_path}" if self.output_path else remote_path
 
             # Upload using client
-            files = {repo_path: (repo_path, content)}
+            files = {repo_path: content}
             result = self.client.upload_files(branch=self.branch, files=files, message=message)
 
             # Extract commit SHA from response
