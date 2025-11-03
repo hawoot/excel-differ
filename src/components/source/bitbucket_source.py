@@ -151,6 +151,8 @@ class BitbucketSource(SourceInterface):
 
                     for change in changes.get('values', []):
                         file_path = change['path']['toString']
+                        # Normalize path separators (convert Windows \ to /)
+                        file_path = file_path.replace('\\', '/')
                         path_obj = Path(file_path)
 
                         # Check if file matches include patterns

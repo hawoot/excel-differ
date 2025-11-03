@@ -87,31 +87,9 @@ class SourceDestinationSpec:
     Attributes:
         implementation: Component type (e.g., 'bitbucket', 'local_folder')
         config: Implementation-specific configuration dict
-
-    Environment Variables:
-        The 'token' field in config is automatically resolved from ${ENV_VAR} format
-        during __post_init__. For example:
-        - YAML contains: token: ${BITBUCKET_TOKEN}
-        - .env contains: BITBUCKET_TOKEN=my_secret
-        - Result: config['token'] = 'my_secret'
     """
     implementation: str
     config: dict = field(default_factory=dict)
-
-    def __post_init__(self):
-        """Resolve environment variables in config"""
-        if 'token' in self.config:
-            self.config['token'] = self._resolve_env_var(self.config['token'])
-
-    def _resolve_env_var(self, value: str) -> str:
-        """Resolve ${ENV_VAR} references"""
-        if isinstance(value, str) and value.startswith('${') and value.endswith('}'):
-            env_var = value[2:-1]
-            resolved = os.getenv(env_var)
-            if not resolved:
-                raise ValueError(f"Environment variable {env_var} not set")
-            return resolved
-        return value
 
 
 @dataclass
@@ -159,11 +137,13 @@ class LoggingSpec:
 
     Attributes:
         log_dir: Directory for log files (e.g., './logs', './tmp/logs')
+        log_level: Log level (e.g., 'DEBUG', 'INFO', 'WARNING', 'ERROR')
 
     Example:
-        logging = LoggingSpec(log_dir='./logs')
+        logging = LoggingSpec(log_dir='./logs', log_level='INFO')
     """
     log_dir: str
+    log_level: str = 'INFO'  # Default to INFO if not specified
 
 
 @dataclass

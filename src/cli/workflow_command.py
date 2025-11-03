@@ -63,7 +63,7 @@ def workflow_command(config_file):
         orchestrator, workflow = create_orchestrator_from_config(config_file)
 
         # Initialize logging from workflow config
-        log_level = os.getenv('EXCEL_DIFFER_LOG_LEVEL', 'INFO').upper()
+        log_level = workflow.logging.log_level.upper()
         setup_logging(
             log_level=log_level,
             log_dir=workflow.logging.log_dir,

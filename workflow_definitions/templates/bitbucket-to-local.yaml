@@ -4,6 +4,7 @@
 # Logging configuration
 logging:
   log_dir: ./logs
+  log_level: INFO  # DEBUG, INFO, WARNING, ERROR
 
 # State file configuration
 state:

@@ -33,17 +33,6 @@ EXAMPLE USAGE:
     # Load workflow from explicit path
     workflow = load_workflow(Path('components/workflows/workflow_definition.yaml'))
 
-    # Or from user-specified path (e.g., CLI argument)
-    import sys
-    workflow = load_workflow(Path(sys.argv[1]))
-
-    # Or from environment variable (but still explicit)
-    import os
-    workflow_path = os.getenv('EXCEL_DIFFER_WORKFLOW')
-    if not workflow_path:
-        raise ValueError("EXCEL_DIFFER_WORKFLOW environment variable not set")
-    workflow = load_workflow(Path(workflow_path))
-
     # Now you have a WorkflowDefinition object
     print(f"Source: {workflow.source.implementation}")
     print(f"Destination: {workflow.destination.implementation}")

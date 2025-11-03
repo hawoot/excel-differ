@@ -4,42 +4,10 @@ Utility functions for the Excel Flattener.
 Provides file hashing, path handling, and configuration loading.
 """
 import hashlib
-import logging
-import os
 import re
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
-
-from dotenv import load_dotenv
-
-
-# ============================================================================
-# Configuration Loading
-# ============================================================================
-
-def load_config():
-    """
-    Load configuration from environment variables.
-
-    Looks for .env file in current directory and parents.
-    Returns a dict with all FLATTENER_* settings.
-    """
-    # Load .env file if it exists
-    load_dotenv()
-
-    config = {
-        'output_dir': Path(os.getenv('FLATTENER_OUTPUT_DIR', './tmp/flats')),
-        'log_dir': os.getenv('FLATTENER_LOG_DIR', './tmp/logs'),
-        'log_level': os.getenv('FLATTENER_LOG_LEVEL', 'INFO').upper(),
-        'extraction_timeout': int(os.getenv('FLATTENER_EXTRACTION_TIMEOUT', '900')),
-        'max_file_size_mb': int(os.getenv('FLATTENER_MAX_FILE_SIZE_MB', '200')),
-        'temp_dir': os.getenv('FLATTENER_TEMP_DIR', './tmp/temp'),
-    }
-
-    return config
-
 
 # ============================================================================
 # File Operations

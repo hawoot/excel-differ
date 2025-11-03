@@ -61,7 +61,7 @@ class BitbucketClient:
 
     def get_file(self, path: str, ref: str) -> bytes:
         """Download file content at specific commit."""
-        url = f"{self.base_url}/browse/{path}"
+        url = f"{self.base_url}/raw/{path}"
         response = requests.get(url, params={'at': ref}, headers={'Authorization': f'Bearer {self.token}'})
         response.raise_for_status()
         return response.content
